@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { attachOwnerCookie, ownerForRequest } from "@/server/session";
 
 export function assertSameOrigin(request: NextRequest) {
-  if (request.method === "GET" || process.env.NODE_ENV !== "production") return;
+  if (request.method === "GET") return;
   const origin = request.headers.get("origin");
   const host = request.headers.get("host");
   if (!origin || !host || new URL(origin).host !== host) throw new Error("Cross-site mutation request rejected.");

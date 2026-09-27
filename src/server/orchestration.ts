@@ -1,217 +1,190 @@
 import { componentTreePrompt, classifierPrompt, filePlanPrompt, generationPrompt, PROMPT_VERSION, refinementIntentPrompt, repairPlanPrompt, repairPrompt, reviewPrompt, tokenPrompt, userRefinementPrompt, visualReviewPrompt, visualSpecPrompt } from "@/lib/prompts";
-import type { Evaluation, FilePlan, GeneratedProject, ManifestFile, VisualSpec } from "@/lib/domain";
+import type { Evaluation, FilePlan, GeneratedProject, ManifestFile, Revision, VisualSpec } from "@/lib/domain";
 import { accessibilityReviewSchema, componentTreeSchema, designTokensSchema, evaluationSchema, filePlanSchema, finalQaSchema, generatedProjectSchema, issueListSchema, patchSetSchema, referenceClassificationSchema, refinementIntentSchema, repairPlanSchema, visualSpecSchema } from "@/lib/schemas";
-import { structuredOpenRouterCall } from "@/server/openrouter";
-import { store } from "@/server/repository";
-import { validateGeneratedProject } from "@/server/validation";
-import { renderAndCompare } from "@/server/sandbox";
+import { structuredOpenRouterCall } from "./openrouter";
+import { store, type TaskInput } from "./repository";
+import { validateGeneratedProject } from "./validation";
+import { renderAndCompare } from "./sandbox";
+import { jobContext } from "./job-context";
+import { compareImages } from "./visual-comparison";
+import { assertSourceManifest } from "./scaffold";
 
-async function event(jobId: string, type: string, safeMessage: string, level: "info" | "success" | "warning" | "error" = "info") {
-  await store.appendEvent(jobId, { type, safeMessage, level });
-}
+type GenerationInput = { projectId: string; ownerId: string; assetId: string; visualSpec: VisualSpec; framework: "react-tailwind" | "nextjs-tailwind"; targetViewport: { width: number; height: number }; modelId?: string };
+type RefinementInput = { revisionId: string; ownerId: string; userIntent: string; lockedRegions: Array<{ label: string; bounds: [number, number, number, number] }> };
+const event = (jobId: string, type: string, safeMessage: string, level: "info" | "success" | "warning" | "error" = "info") => store.appendEvent(jobId, { type, safeMessage, level });
 
-async function ensureJobActive(jobId: string, ownerId: string) {
-  const current = await store.getJob(jobId, ownerId);
-  if (current.cancelledAt || current.phase === "cancelling" || current.phase === "cancelled") {
-    await store.updateJob(jobId, { phase: "cancelled" });
-    await event(jobId, "generation.cancelled", "The job was cancelled safely. No new revision was created.", "warning");
-    throw new Error("JOB_CANCELLED");
-  }
+async function active(jobId: string, ownerId: string) {
+  if (jobContext.getStore()?.signal.aborted || (await store.getJob(jobId, ownerId)).cancelledAt) throw new Error("JOB_CANCELLED");
 }
 
 export async function analyseAsset(input: { projectId: string; assetId: string; ownerId: string; userIntent?: string; lockedRegions?: Array<{ label: string; bounds: [number, number, number, number] }> }) {
-  const asset = await store.getAsset(input.assetId, input.ownerId);
-  if (asset.projectId !== input.projectId) throw new Error("The selected reference does not belong to this project.");
-  if (asset.kind !== "image" && asset.kind !== "video_frame") throw new Error("Choose an extracted video frame before visual analysis.");
-  const bytes = await store.readAssetBytes(asset);
-  const imageDataUrl = `data:${asset.mimeType};base64,${bytes.toString("base64")}`;
-  const classification = await structuredOpenRouterCall({
-    role: "vision",
-    prompt: classifierPrompt({ kind: asset.kind, name: asset.name, mimeType: asset.mimeType, bytes: asset.bytes, width: asset.width, height: asset.height }),
-  });
-  referenceClassificationSchema.parse(classification.value);
-  const analysis = await structuredOpenRouterCall<VisualSpec>({
-    role: "vision",
-    prompt: visualSpecPrompt({ width: asset.width ?? 1440, height: asset.height ?? 900, assetKind: asset.kind, userIntent: input.userIntent, lockedRegions: input.lockedRegions }),
-    imageDataUrl,
-  });
+  const asset = await store.getProjectReference(input.projectId, input.ownerId, input.assetId);
+  const imageDataUrl = "data:" + asset.mimeType + ";base64," + (await store.readAssetBytes(asset)).toString("base64");
+  const classification = await structuredOpenRouterCall({ role: "vision", imageDataUrl, prompt: classifierPrompt({ kind: asset.kind, width: asset.width, height: asset.height, mimeType: asset.mimeType }) });
+  const classified = referenceClassificationSchema.parse(classification.value);
+  if (classified.readiness !== "ready") throw new Error(classified.nextAction);
+  const analysis = await structuredOpenRouterCall<VisualSpec>({ role: "vision", prompt: visualSpecPrompt({ width: asset.width ?? 1440, height: asset.height ?? 900, assetKind: asset.kind, userIntent: input.userIntent, lockedRegions: input.lockedRegions }), imageDataUrl });
   const spec = visualSpecSchema.parse(analysis.value);
-  await store.setSpec(asset.projectId, input.ownerId, spec);
-  return { spec, modelId: analysis.modelId, classification: classification.value };
+  if (asset.width && asset.height) spec.reference.viewport = { width: asset.width, height: asset.height };
+  await store.setSpec(input.projectId, input.ownerId, spec);
+  return { spec, modelId: analysis.modelId, classification: classified };
 }
 
-export async function startGeneration(input: { projectId: string; ownerId: string; assetId: string; visualSpec: VisualSpec; framework: "react-tailwind" | "nextjs-tailwind"; targetViewport: { width: number; height: number }; modelId?: string }) {
+export async function startGeneration(input: GenerationInput, key?: string) {
+  await store.getProjectReference(input.projectId, input.ownerId, input.assetId);
+  const job = await store.createJob(input.projectId, input.ownerId, { kind: "generation", ownerId: input.ownerId, data: input }, key);
   await store.setSpec(input.projectId, input.ownerId, input.visualSpec);
-  const job = await store.createJob(input.projectId, input.ownerId);
-  void runGeneration(job.id, input).catch(async (error) => {
-    const safeMessage = error instanceof Error ? error.message.replace(/sk-or-v1-[A-Za-z0-9_-]+/g, "[redacted]").slice(0, 800) : "The generation failed unexpectedly.";
-    if (safeMessage === "JOB_CANCELLED") return;
-    await store.updateJob(job.id, { phase: "failed", error: safeMessage });
-    await event(job.id, "generation.failed", safeMessage, "error");
-  });
   return job;
+}
+
+export async function startRefinement(input: RefinementInput, key?: string) {
+  const parent = await store.getRevision(input.revisionId, input.ownerId);
+  return store.createJob(parent.projectId, input.ownerId, { kind: "refinement", ownerId: input.ownerId, data: input }, key);
 }
 
 function applyPatch(files: ManifestFile[], patch: { files: ManifestFile[] }, plan: FilePlan) {
-  const permitted = new Set(plan.files.map((file) => file.path));
-  const byPath = new Map(files.map((file) => [file.path, file]));
+  const permitted = new Set(plan.files.map(file => file.path));
+  const changed = new Map<string, ManifestFile>();
   for (const replacement of patch.files) {
-    if (!permitted.has(replacement.path) || !byPath.has(replacement.path)) throw new Error(`Repair attempted an unauthorized path: ${replacement.path}`);
-    byPath.set(replacement.path, replacement);
+    if (!permitted.has(replacement.path) || !files.some(f => f.path === replacement.path) || changed.has(replacement.path)) throw new Error("Repair attempted an unauthorized or duplicate path.");
+    changed.set(replacement.path, replacement);
   }
-  return files.map((file) => byPath.get(file.path) ?? file);
+  const result = files.map(file => changed.get(file.path) ?? file);
+  assertSourceManifest(result);
+  return result;
 }
 
-async function repairFiles(input: { mode: "build" | "visual"; files: ManifestFile[]; plan: FilePlan; findings: unknown; modelId?: string; viewport: { width: number; height: number }; refinementPass?: number }) {
-  const planResponse = await structuredOpenRouterCall({ role: "repair", prompt: repairPlanPrompt({ findings: input.findings, files: input.files, filePlan: input.plan }), requestedModelId: input.modelId });
-  const repairPlan = repairPlanSchema.parse(planResponse.value);
-  const patchResponse = await structuredOpenRouterCall({ role: "repair", prompt: repairPrompt({ mode: input.mode, filePlan: input.plan, files: input.files, findings: { repairPlan, diagnostics: input.findings }, refinementPass: input.refinementPass, viewport: input.viewport }), requestedModelId: input.modelId });
-  const patch = patchSetSchema.parse(patchResponse.value);
-  return { files: applyPatch(input.files, patch, input.plan), patch };
+function hardGate(evaluation: Evaluation) {
+  return evaluation.buildFindings.length > 0 || evaluation.metrics.horizontalOverflow || evaluation.a11yFindings.some(f => ["critical", "serious"].includes(f.severity)) || evaluation.visualFindings.some(f => f.severity === "critical");
 }
 
-async function runGeneration(jobId: string, input: { projectId: string; ownerId: string; assetId: string; visualSpec: VisualSpec; framework: "react-tailwind" | "nextjs-tailwind"; targetViewport: { width: number; height: number }; modelId?: string }) {
-  const setPhase = async (phase: "planning" | "generating" | "validating" | "evaluating" | "ready") => store.updateJob(jobId, { phase });
-  await ensureJobActive(jobId, input.ownerId);
-  await setPhase("planning");
-  await event(jobId, "blueprint.started", "Normalizing observed design tokens.");
-  const tokenResponse = await structuredOpenRouterCall({ role: "blueprint", prompt: tokenPrompt(input.visualSpec), requestedModelId: input.modelId });
-  await ensureJobActive(jobId, input.ownerId);
-  const tokens = designTokensSchema.parse(tokenResponse.value);
-  await event(jobId, "blueprint.tokens_ready", "Design tokens are ready.", "success");
-  const treeResponse = await structuredOpenRouterCall({ role: "blueprint", prompt: componentTreePrompt(input.visualSpec, tokens), requestedModelId: input.modelId });
-  await ensureJobActive(jobId, input.ownerId);
-  const tree = componentTreeSchema.parse(treeResponse.value);
-  const planResponse = await structuredOpenRouterCall<FilePlan>({ role: "blueprint", prompt: filePlanPrompt(input.visualSpec, tokens, tree, input.framework), requestedModelId: input.modelId });
-  await ensureJobActive(jobId, input.ownerId);
-  const filePlan = filePlanSchema.parse(planResponse.value);
-  await event(jobId, "blueprint.ready", `Component and file plan contains ${filePlan.files.length} files.`, "success");
-
-  await setPhase("generating");
-  await event(jobId, "generation.started", "Generating the approved file manifest.");
-  const generation = await structuredOpenRouterCall<GeneratedProject>({ role: "code", prompt: generationPrompt(input.visualSpec, filePlan, input.framework, input.targetViewport), requestedModelId: input.modelId, stream: true });
-  await ensureJobActive(jobId, input.ownerId);
-  let project = generatedProjectSchema.parse(generation.value);
-  await store.updateJob(jobId, { modelId: generation.modelId });
-  await event(jobId, "generation.files_ready", `Received ${project.files.length} source files.`, "success");
-
-  await setPhase("validating");
-  await event(jobId, "validation.started", "Checking file paths, source safety, imports, syntax, and accessibility.");
-  let evaluation = validateGeneratedProject(project, filePlan);
-  const staticReview = await structuredOpenRouterCall({ role: "review", prompt: reviewPrompt("static", { files: project.files, diagnostics: evaluation.buildFindings }), requestedModelId: input.modelId });
-  await ensureJobActive(jobId, input.ownerId);
-  const review = issueListSchema.parse(staticReview.value);
-  for (const issue of review.issues.filter((item) => item.severity === "critical" || item.severity === "high")) {
-    evaluation.buildFindings.push({ id: `model-${evaluation.buildFindings.length}`, file: issue.file, category: issue.category === "security" ? "runtime" : "build", message: issue.explanation });
-  }
-  if (evaluation.buildFindings.length) {
-    await event(jobId, "validation.repairing", `${evaluation.buildFindings.length} validation issue${evaluation.buildFindings.length === 1 ? "" : "s"} will receive one bounded repair.`, "warning");
-    const repaired = await repairFiles({ mode: "build", files: project.files, plan: filePlan, findings: evaluation.buildFindings, modelId: input.modelId, viewport: input.targetViewport });
-    await ensureJobActive(jobId, input.ownerId);
-    project = { ...project, files: repaired.files, assumptionsApplied: [...project.assumptionsApplied, ...repaired.patch.assumptionsChanged] };
-    evaluation = validateGeneratedProject(project, filePlan);
-    if (evaluation.buildFindings.length) throw new Error("The bounded build repair did not pass validation. The previous ready revision remains unchanged.");
-    await event(jobId, "validation.repaired", "The bounded build repair now passes static validation.", "success");
-  }
-  const accessibilityReview = await structuredOpenRouterCall({ role: "review", prompt: reviewPrompt("a11y", { visualSpec: input.visualSpec, files: project.files, automatedFindings: evaluation.a11yFindings }), requestedModelId: input.modelId });
-  await ensureJobActive(jobId, input.ownerId);
-  const a11y = accessibilityReviewSchema.parse(accessibilityReview.value);
-  evaluation.a11yFindings.push(...a11y.issues.map((issue, index) => ({ id: `review-a11y-${index}`, severity: issue.severity, message: issue.issue, target: issue.element })));
-  if (evaluation.a11yFindings.some((finding) => ["critical", "serious"].includes(finding.severity))) throw new Error("Accessibility review found a serious issue that must be corrected before a revision is ready.");
-  await event(jobId, "validation.passed", "Static source and accessibility checks passed.", "success");
-
-  await setPhase("evaluating");
-  await event(jobId, "preview.started", "Rendering the generated project inside an isolated, network-restricted browser.");
-  const asset = await store.getProjectReference(input.projectId, input.ownerId, input.assetId);
-  const referenceDataUrl = `data:${asset.mimeType};base64,${(await store.readAssetBytes(asset)).toString("base64")}`;
-  let render = await renderAndCompare({ files: project.files, plan: filePlan, referenceDataUrl, viewport: input.targetViewport });
-  await ensureJobActive(jobId, input.ownerId);
-  evaluation.metrics.visualScore = render.visualScore;
+async function evaluate(project: GeneratedProject, plan: FilePlan, input: GenerationInput, referenceDataUrl: string) {
+  const evaluation = validateGeneratedProject(project, plan);
+  if (evaluation.buildFindings.length) throw new Error(JSON.stringify(evaluation.buildFindings));
+  assertSourceManifest(project.files);
+  const render = await renderAndCompare({ files: project.files, plan, referenceDataUrl, viewport: input.targetViewport, visualSpec: input.visualSpec, framework: input.framework });
+  evaluation.a11yFindings.push(...render.a11yFindings);
   evaluation.visualFindings = render.visualFindings;
-  const visualReview = await structuredOpenRouterCall<Evaluation>({ role: "vision", prompt: visualReviewPrompt({ visualSpec: input.visualSpec, evaluation, viewport: input.targetViewport }), imageDataUrls: [referenceDataUrl, `data:image/png;base64,${render.screenshot.toString("base64")}`], requestedModelId: input.modelId });
-  await ensureJobActive(jobId, input.ownerId);
-  const reviewed = evaluationSchema.parse(visualReview.value);
-  evaluation.visualFindings.push(...reviewed.visualFindings);
-  await event(jobId, "preview.ready", `Preview captured with an initial visual score of ${Math.round(render.visualScore * 100)}%.`, "success");
-
-  const maxRefinements = Math.min(3, Math.max(0, Number(process.env.MAX_REFINEMENT_ITERATIONS ?? 3)));
-  for (let pass = 1; pass <= maxRefinements && evaluation.visualFindings.some((finding) => finding.severity === "critical" || finding.severity === "high"); pass += 1) {
-    await store.updateJob(jobId, { phase: "refining" });
-    await event(jobId, "refinement.started", `Making focused visual refinement ${pass} of ${maxRefinements}.`);
-    const repaired = await repairFiles({ mode: "visual", files: project.files, plan: filePlan, findings: evaluation.visualFindings, modelId: input.modelId, viewport: input.targetViewport, refinementPass: pass });
-    await ensureJobActive(jobId, input.ownerId);
-    const candidateProject = { ...project, files: repaired.files, assumptionsApplied: [...project.assumptionsApplied, ...repaired.patch.assumptionsChanged] };
-    const candidateEvaluation = validateGeneratedProject(candidateProject, filePlan);
-    if (candidateEvaluation.buildFindings.length) {
-      await event(jobId, "refinement.reverted", "A visual patch was rejected because it violated a hard validation gate.", "warning");
-      continue;
-    }
-    const candidateRender = await renderAndCompare({ files: candidateProject.files, plan: filePlan, referenceDataUrl, viewport: input.targetViewport });
-    await ensureJobActive(jobId, input.ownerId);
-    if (candidateRender.visualScore < render.visualScore) {
-      await event(jobId, "refinement.reverted", "A visual patch was reverted because the deterministic comparison score declined.", "warning");
-      continue;
-    }
-    project = candidateProject;
-    render = candidateRender;
-    evaluation = { ...candidateEvaluation, visualFindings: candidateRender.visualFindings, metrics: { visualScore: candidateRender.visualScore, previousVisualScore: evaluation.metrics.visualScore, horizontalOverflow: false } };
-    await event(jobId, "refinement.accepted", `Refinement ${pass} improved or preserved the visual comparison score.`, "success");
-  }
-
-  const finalQa = await structuredOpenRouterCall({ role: "review", prompt: reviewPrompt("final", { filePlan, evaluation, rules: "A preview failure means NOT_READY." }), requestedModelId: input.modelId });
-  await ensureJobActive(jobId, input.ownerId);
-  const qa = finalQaSchema.parse(finalQa.value);
-  if (qa.status !== "READY" || qa.validation.preview !== "pass") throw new Error("Final QA found remaining blocking issues. The previous ready revision remains unchanged.");
-  const revision = await store.createRevision({ projectId: input.projectId, promptVersion: PROMPT_VERSION, modelId: generation.modelId, files: project.files, evaluation, assumptions: project.assumptionsApplied, summary: project.summary, filePlan });
-  await store.savePreview(revision.id, render.screenshot);
-  await store.updateJob(jobId, { phase: "ready", revisionId: revision.id });
-  await event(jobId, "revision.ready", "Revision is ready for preview and export.", "success");
+  evaluation.metrics = render.metrics;
+  return { evaluation, render };
 }
 
-export async function startRefinement(input: { revisionId: string; ownerId: string; userIntent: string; lockedRegions: Array<{ label: string; bounds: [number, number, number, number] }> }) {
-  const parent = await store.getRevision(input.revisionId, input.ownerId);
-  const job = await store.createJob(parent.projectId, input.ownerId);
-  void runRefinement(job.id, parent, input).catch(async (error) => {
-    const safeMessage = error instanceof Error ? error.message.replace(/sk-or-v1-[A-Za-z0-9_-]+/g, "[redacted]").slice(0, 800) : "The refinement failed unexpectedly.";
-    if (safeMessage === "JOB_CANCELLED") return;
-    await store.updateJob(job.id, { phase: "failed", error: safeMessage });
-    await event(job.id, "refinement.failed", safeMessage, "error");
-  });
-  return job;
+async function repair(project: GeneratedProject, filePlan: FilePlan, input: GenerationInput, findings: unknown, mode: "build" | "visual", referenceDataUrl: string, pass = 1) {
+  const planned = await structuredOpenRouterCall({ role: "repair", prompt: repairPlanPrompt({ findings, files: project.files, filePlan }), requestedModelId: input.modelId });
+  const repairPlan = repairPlanSchema.parse(planned.value);
+  const response = await structuredOpenRouterCall({ role: "repair", imageDataUrl: mode === "visual" ? referenceDataUrl : undefined, prompt: repairPrompt({ mode, filePlan, files: project.files, findings: { repairPlan, diagnostics: findings, visualSpec: input.visualSpec }, viewport: input.targetViewport, refinementPass: pass }), requestedModelId: input.modelId });
+  const patch = patchSetSchema.parse(response.value);
+  return { ...project, files: applyPatch(project.files, patch, filePlan), assumptionsApplied: [...project.assumptionsApplied, ...patch.assumptionsChanged] };
 }
 
-async function runRefinement(jobId: string, parent: import("@/lib/domain").Revision, input: { revisionId: string; ownerId: string; userIntent: string; lockedRegions: Array<{ label: string; bounds: [number, number, number, number] }> }) {
-  await ensureJobActive(jobId, input.ownerId);
-  await store.updateJob(jobId, { phase: "refining", modelId: parent.modelId });
-  await event(jobId, "refinement.intent_started", "Interpreting the requested bounded change.");
-  const spec = await store.getSpec(parent.projectId, input.ownerId);
-  if (!spec) throw new Error("The approved Visual Spec is unavailable; reanalyse the reference before refining.");
-  const interpretationResponse = await structuredOpenRouterCall({ role: "blueprint", prompt: refinementIntentPrompt({ userIntent: input.userIntent, lockedRegions: input.lockedRegions, visualSpec: spec, currentManifest: parent.files }), requestedModelId: parent.modelId });
-  await ensureJobActive(jobId, input.ownerId);
-  const interpretation = refinementIntentSchema.parse(interpretationResponse.value);
-  if (interpretation.conflicts.length || interpretation.requiresReferenceReanalysis || !interpretation.targets.length) throw new Error(interpretation.conflicts[0] ?? "This request exceeds the confirmed reconstruction scope and needs an explicit scope expansion.");
-  await event(jobId, "refinement.intent_ready", `Targeting ${interpretation.targets.join(", ")}.`, "success");
-  const patchResponse = await structuredOpenRouterCall({ role: "repair", prompt: userRefinementPrompt({ userIntent: input.userIntent, interpretation, visualSpec: spec, currentManifest: parent.files, lockedRegions: input.lockedRegions, filePlan: parent.filePlan }), requestedModelId: parent.modelId });
-  await ensureJobActive(jobId, input.ownerId);
-  const patch = patchSetSchema.parse(patchResponse.value);
-  if (!patch.files.length) throw new Error(patch.rationale[0]?.unresolvedReason ?? "No safe bounded code change was produced for this refinement request.");
-  const files = applyPatch(parent.files, patch, parent.filePlan);
-  const candidate: GeneratedProject = { summary: parent.summary, files, interactionNotes: [], assumptionsApplied: [...parent.assumptions, ...patch.assumptionsChanged] };
-  let evaluation = validateGeneratedProject(candidate, parent.filePlan);
-  if (evaluation.buildFindings.length) throw new Error("The refinement patch was rejected by the static validation gate; the parent revision remains available.");
-  if (evaluation.a11yFindings.some((finding) => ["critical", "serious"].includes(finding.severity))) throw new Error("The refinement patch introduced a serious accessibility issue and was rejected.");
-  await store.updateJob(jobId, { phase: "rendering" });
-  const asset = await store.getProjectReference(parent.projectId, input.ownerId);
-  const referenceDataUrl = `data:${asset.mimeType};base64,${(await store.readAssetBytes(asset)).toString("base64")}`;
-  const render = await renderAndCompare({ files, plan: parent.filePlan, referenceDataUrl, viewport: spec.reference.viewport });
-  await ensureJobActive(jobId, input.ownerId);
-  evaluation = { ...evaluation, visualFindings: render.visualFindings, metrics: { visualScore: render.visualScore, previousVisualScore: parent.evaluation.metrics.visualScore, horizontalOverflow: false } };
-  const qaResponse = await structuredOpenRouterCall({ role: "review", prompt: reviewPrompt("final", { evaluation, parent: parent.id, requestedChanges: interpretation.requestedChanges, rules: "A preview failure means NOT_READY." }), requestedModelId: parent.modelId });
-  await ensureJobActive(jobId, input.ownerId);
+async function visualReview(evaluation: Evaluation, render: Awaited<ReturnType<typeof renderAndCompare>>, input: GenerationInput, referenceDataUrl: string) {
+  const response = await structuredOpenRouterCall({ role: "vision", prompt: visualReviewPrompt({ visualSpec: input.visualSpec, evaluation }), imageDataUrls: [referenceDataUrl, "data:image/png;base64," + render.screenshot.toString("base64")], requestedModelId: input.modelId });
+  evaluation.visualFindings.push(...evaluationSchema.parse(response.value).visualFindings);
+}
+
+async function publish(jobId: string, input: GenerationInput, project: GeneratedProject, filePlan: FilePlan, checked: Awaited<ReturnType<typeof evaluate>>, extra: Partial<Revision>) {
+  await active(jobId, input.ownerId);
+  if (hardGate(checked.evaluation)) throw new Error("Blocking validation findings remain. The previous revision is preserved.");
+  // Recheck the final files, including any visual repair, instead of dropping
+  // supplemental findings when a new deterministic evaluation is constructed.
+  const staticReview = issueListSchema.parse((await structuredOpenRouterCall({ role: "review", prompt: reviewPrompt("static", { files: project.files, diagnostics: checked.evaluation.buildFindings }), requestedModelId: input.modelId })).value);
+  const a11yReview = accessibilityReviewSchema.parse((await structuredOpenRouterCall({ role: "review", prompt: reviewPrompt("a11y", { visualSpec: input.visualSpec, files: project.files, automatedFindings: checked.render.a11yFindings }), requestedModelId: input.modelId })).value);
+  if (staticReview.issues.some(issue => ["critical", "high"].includes(issue.severity)) || a11yReview.issues.some(issue => ["critical", "serious"].includes(issue.severity))) throw new Error("Final source review still has blocking findings. The previous revision is preserved.");
+  const qaResponse = await structuredOpenRouterCall({ role: "review", prompt: reviewPrompt("final", { filePlan, files: project.files, visualSpec: input.visualSpec, assumptions: project.assumptionsApplied, evaluation: checked.evaluation, rules: "Deterministic gates cannot be overridden." }), requestedModelId: input.modelId });
   const qa = finalQaSchema.parse(qaResponse.value);
-  if (qa.status !== "READY" || qa.validation.preview !== "pass" || evaluation.visualFindings.some((finding) => finding.severity === "critical")) throw new Error("Final QA retained the previous revision because this refinement has unresolved blocking evidence.");
-  const revision = await store.createRevision({ projectId: parent.projectId, parentRevisionId: parent.id, promptVersion: PROMPT_VERSION, modelId: parent.modelId, files, evaluation, assumptions: candidate.assumptionsApplied, summary: parent.summary, filePlan: parent.filePlan });
-  await store.savePreview(revision.id, render.screenshot);
+  if (qa.status !== "READY" || Object.values(qa.validation).includes("fail") || qa.blockingIssues.length) throw new Error("Final QA: " + (qa.blockingIssues.map(i => i.reason).join("; ") || "Release gates did not pass."));
+  await active(jobId, input.ownerId);
+  const job = await store.getJob(jobId, input.ownerId);
+  const revision = await store.createRevision({ ...extra, projectId: input.projectId, jobId, framework: input.framework, referenceAssetId: input.assetId, visualSpec: input.visualSpec, promptVersion: PROMPT_VERSION, modelId: job.modelId ?? input.modelId ?? "unknown", modelAudit: job.modelAudit, files: project.files, evaluation: checked.evaluation, assumptions: project.assumptionsApplied, summary: project.summary, filePlan });
+  await store.savePreview(revision.id, checked.render.screenshot);
+  await store.saveArtifact(revision.id, "bundle", checked.render.html);
+  await store.saveArtifact(revision.id, "diff", checked.render.diff);
+  await active(jobId, input.ownerId);
   await store.updateJob(jobId, { phase: "ready", revisionId: revision.id });
-  await event(jobId, "revision.ready", "Refined immutable revision is ready for comparison and export.", "success");
+  await event(jobId, "revision.ready", "Build, browser and accessibility checks passed. Compare the remaining visual findings before exporting.", "success");
+}
+
+async function runGeneration(jobId: string, input: GenerationInput) {
+  await active(jobId, input.ownerId);
+  const asset = await store.getProjectReference(input.projectId, input.ownerId, input.assetId);
+  const referenceDataUrl = "data:" + asset.mimeType + ";base64," + (await store.readAssetBytes(asset)).toString("base64");
+  await store.updateJob(jobId, { phase: "planning" });
+  await event(jobId, "blueprint.started", "Planning components from the confirmed reference.");
+  const tokens = designTokensSchema.parse((await structuredOpenRouterCall({ role: "blueprint", prompt: tokenPrompt(input.visualSpec), requestedModelId: input.modelId })).value);
+  const tree = componentTreeSchema.parse((await structuredOpenRouterCall({ role: "blueprint", prompt: componentTreePrompt(input.visualSpec, tokens), requestedModelId: input.modelId })).value);
+  const plan = filePlanSchema.parse((await structuredOpenRouterCall({ role: "blueprint", prompt: filePlanPrompt(input.visualSpec, tokens, tree, input.framework), requestedModelId: input.modelId })).value);
+  assertSourceManifest(plan.files.map(file => ({ path: file.path, content: "" })));
+  if (!plan.files.some(file => file.path === plan.entry && file.path.endsWith(".tsx")) || new Set(plan.files.map(file => file.path)).size !== plan.files.length) throw new Error("The component blueprint has an invalid entry or duplicate files.");
+  const regions = new Set(input.visualSpec.observations.layout.map(region => region.id));
+  if (plan.files.some(file => file.visualRegions.some(region => !regions.has(region)))) throw new Error("The file plan refers to a region outside the confirmed specification.");
+  await store.updateJob(jobId, { filePlan: plan, componentTree: tree, phase: "generating" });
+  await event(jobId, "blueprint.ready", "Blueprint ready: " + plan.files.length + " files. The component and file tree is available.", "success");
+  const generated = await structuredOpenRouterCall<GeneratedProject>({ role: "code", prompt: generationPrompt(input.visualSpec, plan, input.framework, input.targetViewport), requestedModelId: input.modelId, stream: true });
+  let project = generatedProjectSchema.parse(generated.value);
+  await store.updateJob(jobId, { modelId: generated.modelId, phase: "validating" });
+  await event(jobId, "validation.started", "Compiling, linting, rendering and measuring the generated project.");
+  let checked: Awaited<ReturnType<typeof evaluate>>;
+  try { checked = await evaluate(project, plan, input, referenceDataUrl); }
+  catch (error) {
+    await event(jobId, "validation.repair", "Build diagnostics are receiving one bounded repair.", "warning");
+    project = await repair(project, plan, input, String(error).slice(0, 8000), "build", referenceDataUrl);
+    checked = await evaluate(project, plan, input, referenceDataUrl);
+  }
+  const review = issueListSchema.parse((await structuredOpenRouterCall({ role: "review", prompt: reviewPrompt("static", { files: project.files, diagnostics: checked.evaluation.buildFindings }), requestedModelId: input.modelId })).value);
+  const a11y = accessibilityReviewSchema.parse((await structuredOpenRouterCall({ role: "review", prompt: reviewPrompt("a11y", { visualSpec: input.visualSpec, files: project.files, automatedFindings: checked.evaluation.a11yFindings }), requestedModelId: input.modelId })).value);
+  checked.evaluation.buildFindings.push(...review.issues.filter(i => ["critical", "high"].includes(i.severity)).map((i, n) => ({ id: "review-" + n, file: i.file, category: "runtime" as const, message: i.explanation })));
+  checked.evaluation.a11yFindings.push(...a11y.issues.map((i, n) => ({ id: "review-a11y-" + n, severity: i.severity, message: i.issue, target: i.element })));
+  if (checked.evaluation.buildFindings.length || checked.evaluation.a11yFindings.some(f => ["critical", "serious"].includes(f.severity))) {
+    project = await repair(project, plan, input, checked.evaluation, "build", referenceDataUrl);
+    checked = await evaluate(project, plan, input, referenceDataUrl);
+  }
+  await store.updateJob(jobId, { phase: "evaluating" });
+  await visualReview(checked.evaluation, checked.render, input, referenceDataUrl);
+  const max = Math.min(3, Math.max(0, Number(process.env.MAX_REFINEMENT_ITERATIONS ?? 2)));
+  for (let pass = 1; pass <= max && checked.evaluation.visualFindings.some(f => ["critical", "high"].includes(f.severity)); pass++) {
+    await active(jobId, input.ownerId);
+    await store.updateJob(jobId, { phase: "refining" });
+    await event(jobId, "refinement.started", "Refining measured differences, pass " + pass + " of " + max + ".");
+    const candidate = await repair(project, plan, input, checked.evaluation, "visual", referenceDataUrl, pass);
+    try {
+      const next = await evaluate(candidate, plan, input, referenceDataUrl);
+      await visualReview(next.evaluation, next.render, input, referenceDataUrl);
+      if (hardGate(next.evaluation) || next.render.visualScore < checked.render.visualScore) throw new Error("A hard gate failed or pixel agreement declined.");
+      next.evaluation.metrics.previousVisualScore = checked.render.visualScore;
+      project = candidate; checked = next;
+    } catch (error) { await event(jobId, "refinement.reverted", "Patch rejected; keeping the previous candidate. " + String(error).slice(0, 400), "warning"); }
+  }
+  await publish(jobId, input, project, plan, checked, { componentTree: tree });
+}
+
+async function runRefinement(jobId: string, input: RefinementInput) {
+  const parent = await store.getRevision(input.revisionId, input.ownerId);
+  const spec = parent.visualSpec ?? await store.getSpec(parent.projectId, input.ownerId);
+  if (!spec) throw new Error("Reanalyse the reference before refining.");
+  const asset = await store.getProjectReference(parent.projectId, input.ownerId, parent.referenceAssetId);
+  const generation: GenerationInput = { projectId: parent.projectId, ownerId: input.ownerId, visualSpec: spec, assetId: asset.id, framework: parent.framework ?? "react-tailwind", targetViewport: parent.evaluation.metrics.viewport ?? spec.reference.viewport };
+  const referenceDataUrl = "data:" + asset.mimeType + ";base64," + (await store.readAssetBytes(asset)).toString("base64");
+  await store.updateJob(jobId, { phase: "refining", filePlan: parent.filePlan, componentTree: parent.componentTree });
+  const interpretation = refinementIntentSchema.parse((await structuredOpenRouterCall({ role: "blueprint", prompt: refinementIntentPrompt({ ...input, visualSpec: spec }) })).value);
+  if (interpretation.conflicts.length || interpretation.requiresReferenceReanalysis || !interpretation.targets.length) throw new Error(interpretation.conflicts.join("; ") || "The request needs a revised scope or reference.");
+  const response = await structuredOpenRouterCall({ role: "repair", prompt: userRefinementPrompt({ ...input, interpretation, visualSpec: spec, currentManifest: parent.files, filePlan: parent.filePlan }) });
+  const patch = patchSetSchema.parse(response.value);
+  if (!patch.files.length) throw new Error(patch.rationale[0]?.unresolvedReason ?? "No bounded change was produced.");
+  const project: GeneratedProject = { summary: parent.summary, files: applyPatch(parent.files, patch, parent.filePlan), assumptionsApplied: [...parent.assumptions, ...patch.assumptionsChanged], interactionNotes: [] };
+  const checked = await evaluate(project, parent.filePlan, generation, referenceDataUrl);
+  if (input.lockedRegions.length) {
+    const locks = input.lockedRegions.map((r, n) => ({ id: String(n), region: r.label, boundsPct: r.bounds, description: "Locked", importance: "critical" as const }));
+    const compared = compareImages(await store.readPreview(parent), checked.render.screenshot, locks);
+    if (compared.regions.some(r => r.pixelScore < 0.995)) throw new Error("A locked region changed. Patch rejected; the parent revision is preserved.");
+  }
+  await visualReview(checked.evaluation, checked.render, generation, referenceDataUrl);
+  checked.evaluation.metrics.previousVisualScore = parent.evaluation.metrics.visualScore;
+  await store.updateJob(jobId, { modelId: response.modelId });
+  await publish(jobId, generation, project, parent.filePlan, checked, { parentRevisionId: parent.id, componentTree: parent.componentTree });
+}
+
+export async function executeTask(jobId: string, input: TaskInput) {
+  await store.checkpoint("ownerId", input.ownerId);
+  if (input.kind === "generation") await runGeneration(jobId, input.data as GenerationInput);
+  else await runRefinement(jobId, input.data as RefinementInput);
 }

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { assertMagicBytes, assertSafeRemoteUrl, assertUploadSize, classifyMime } from "@/lib/security";
+import { downloadPublicImage } from "@/server/public-image";
 import { assertIdempotencyKey, assertSameOrigin, jsonForOwner, requestOwner, safeError } from "@/server/http";
 import { store } from "@/server/repository";
 
@@ -9,39 +9,6 @@ export const runtime = "nodejs";
 
 const requestSchema = z.object({ url: z.string().url().max(2048), projectId: z.string().regex(/^[a-zA-Z0-9_-]{8,80}$/).optional() });
 
-async function downloadPublicImage(rawUrl: string) {
-  let url = await assertSafeRemoteUrl(rawUrl);
-  for (let redirectCount = 0; redirectCount <= 3; redirectCount += 1) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12_000);
-    try {
-      const response = await fetch(url, { redirect: "manual", signal: controller.signal, headers: { Accept: "image/avif,image/webp,image/png,image/jpeg,image/gif" } });
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get("location");
-        if (!location) throw new Error("The image URL returned an invalid redirect.");
-        url = await assertSafeRemoteUrl(new URL(location, url).toString());
-        continue;
-      }
-      if (!response.ok) throw new Error(`The image URL could not be downloaded (${response.status}).`);
-      const mimeType = (response.headers.get("content-type") ?? "").split(";")[0].toLowerCase();
-      classifyMime(mimeType);
-      const declaredLength = Number(response.headers.get("content-length") ?? 0);
-      if (declaredLength) assertUploadSize(declaredLength);
-      const buffer = Buffer.from(await response.arrayBuffer());
-      assertUploadSize(buffer.byteLength);
-      assertMagicBytes(buffer, mimeType);
-      return { bytes: buffer, mimeType, name: pathName(url.pathname) };
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  throw new Error("The image URL redirected too many times.");
-}
-
-function pathName(pathname: string) {
-  const name = pathname.split("/").filter(Boolean).at(-1);
-  return (name?.replace(/[^a-zA-Z0-9._-]/g, "_") || "remote-reference").slice(0, 160);
-}
 
 export async function POST(request: NextRequest) {
   try {

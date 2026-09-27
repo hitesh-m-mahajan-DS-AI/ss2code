@@ -1,167 +1,162 @@
+import { createHash } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import type { ZodTypeAny } from "zod";
 import type { ModelCandidate, ModelRole } from "@/lib/domain";
 import { sharedSystemPrompt } from "@/lib/prompts";
+import * as schemas from "@/lib/schemas";
+import { jobContext } from "./job-context";
+import { store } from "./repository";
 
-type OpenRouterModel = {
-  id: string;
-  name?: string;
-  context_length?: number;
-  architecture?: { input_modalities?: string[]; output_modalities?: string[]; supports_response_schema?: boolean };
-  pricing?: { prompt?: string; completion?: string };
+export type CatalogModel = { id: string; context_length?: number; architecture?: { input_modalities?: string[]; output_modalities?: string[] }; supported_parameters?: string[]; pricing?: Record<string, string | undefined> };
+let catalogCache: { fetchedAt: number; models: ModelCandidate[] } | undefined;
+const health = new Map<string, { failures: number; until: number }>();
+const baseUrl = () => {
+  const url = (process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1").replace(/\/$/, "");
+  if (url !== "https://openrouter.ai/api/v1") throw new Error("Only the official OpenRouter inference endpoint is permitted.");
+  return url;
 };
 
-type CachedCatalog = { fetchedAt: number; models: ModelCandidate[] };
-let catalogCache: CachedCatalog | undefined;
-
-const baseUrl = () => (process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1").replace(/\/$/, "");
-const timeoutMs = () => Number(process.env.REQUEST_TIMEOUT_MS ?? 90_000);
-
-function asFreeCandidate(model: OpenRouterModel) {
-  const prompt = model.pricing?.prompt ?? "";
-  const completion = model.pricing?.completion ?? "";
-  return model.id === "openrouter/free" || model.id.endsWith(":free") || (Number(prompt) === 0 && Number(completion) === 0);
+export function isVerifiedFree(model: CatalogModel) {
+  const pricing = model.pricing;
+  return !!pricing && ["prompt", "completion"].every(key => typeof pricing[key] === "string" && pricing[key]!.trim() !== "" && Number(pricing[key]) === 0)
+    && Object.values(pricing).every(value => value === undefined || (value.trim() !== "" && Number(value) === 0));
 }
 
-function familyFor(id: string) {
-  const lowered = id.toLowerCase();
-  for (const family of ["nemotron", "gemma", "qwen", "llama", "mistral", "deepseek"]) if (lowered.includes(family)) return family;
-  return id.split("/")[0] ?? "other";
+export function normalizeModel(model: CatalogModel): ModelCandidate {
+  return { id: model.id, family: ["nemotron", "gemma", "qwen", "llama", "mistral", "deepseek"].find(f => model.id.toLowerCase().includes(f)) ?? model.id.split("/")[0], inputModalities: model.architecture?.input_modalities ?? [], outputModalities: model.architecture?.output_modalities ?? [], contextLength: model.context_length, supportedParameters: model.supported_parameters ?? [], supportsStructuredOutput: model.supported_parameters?.includes("structured_outputs") || model.supported_parameters?.includes("response_format"), isFreeCandidate: isVerifiedFree(model), promptPrice: model.pricing?.prompt, completionPrice: model.pricing?.completion };
 }
 
-export async function getLiveModelCatalog(force = false): Promise<ModelCandidate[]> {
-  if (!force && catalogCache && Date.now() - catalogCache.fetchedAt < 10 * 60_000) return catalogCache.models;
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured. Add it to server environment variables; it is never sent to the browser.");
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.min(timeoutMs(), 30_000));
-  try {
-    const response = await fetch(`${baseUrl()}/models`, { headers: { Authorization: `Bearer ${apiKey}` }, signal: controller.signal, cache: "no-store" });
-    if (!response.ok) throw new Error(`OpenRouter model catalog request failed (${response.status}).`);
-    const body = (await response.json()) as { data?: OpenRouterModel[] };
-    const models = (body.data ?? []).map((model) => ({
-      id: model.id,
-      family: familyFor(model.id),
-      inputModalities: model.architecture?.input_modalities ?? ["text"],
-      outputModalities: model.architecture?.output_modalities ?? ["text"],
-      contextLength: model.context_length,
-      supportsStructuredOutput: model.architecture?.supports_response_schema,
-      isFreeCandidate: asFreeCandidate(model),
-      promptPrice: model.pricing?.prompt,
-      completionPrice: model.pricing?.completion,
-    }));
-    // The OpenRouter free router is itself capability-aware. Keep it as a live
-    // free fallback when individual free variants are rate-limited or rotate.
-    if (!models.some((candidate) => candidate.id === "openrouter/free")) {
-      models.push({ id: "openrouter/free", family: "router", inputModalities: ["text", "image"], outputModalities: ["text"], contextLength: 16_000, supportsStructuredOutput: false, isFreeCandidate: true, promptPrice: "0", completionPrice: "0" });
-    }
-    catalogCache = { fetchedAt: Date.now(), models };
-    return models;
-  } finally {
-    clearTimeout(timer);
-  }
+export async function getLiveModelCatalog(force = false) {
+  if (!force && catalogCache && Date.now() - catalogCache.fetchedAt < 300_000) return catalogCache.models;
+  const response = await fetch(baseUrl() + "/models", { signal: AbortSignal.timeout(20_000), cache: "no-store" });
+  if (!response.ok) throw new Error("OpenRouter model catalog unavailable (" + response.status + "). Retry later.");
+  const body = await response.json() as { data?: CatalogModel[] };
+  if (!Array.isArray(body.data)) throw new Error("Invalid OpenRouter catalog.");
+  const models = body.data.map(normalizeModel);
+  catalogCache = { fetchedAt: Date.now(), models };
+  return models;
 }
 
-function roleRequirements(role: ModelRole) {
-  return { image: role === "vision", context: role === "code" ? 16_000 : 4_000 };
+export function eligibleModels(models: ModelCandidate[], role: ModelRole, context: number, requestedModelId?: string, excluded: string[] = []) {
+  const families = (process.env.MODEL_PREFERRED_FAMILIES ?? "nemotron,gemma").split(",");
+  const score = (model: ModelCandidate) => model.id === requestedModelId ? 100 : model.id === "openrouter/free" ? 20 : (families.includes(model.family) ? 10 : 0) + (model.supportsStructuredOutput ? 2 : 0);
+  return models.filter(model => model.isFreeCandidate && model.outputModalities.includes("text") && model.inputModalities.includes(role === "vision" ? "image" : "text") && (model.contextLength ?? 0) >= context && !excluded.includes(model.id) && (health.get(model.id)?.until ?? 0) <= Date.now()).sort((a, b) => score(b) - score(a));
 }
 
 export async function resolveModel(role: ModelRole, requestedModelId?: string) {
-  const policy = process.env.MODEL_POLICY ?? "free_only";
-  const models = await getLiveModelCatalog();
-  const needs = roleRequirements(role);
-  const eligible = models.filter((candidate) =>
-    (policy !== "free_only" || candidate.isFreeCandidate) &&
-    (!needs.image || candidate.inputModalities.includes("image")) &&
-    (candidate.contextLength === undefined || candidate.contextLength >= needs.context),
-  );
-  if (requestedModelId) {
-    const requested = models.find((candidate) => candidate.id === requestedModelId);
-    if (!requested) throw new Error("The selected model is no longer present in the live OpenRouter catalog.");
-    if (!eligible.some((candidate) => candidate.id === requested.id)) throw new Error("The selected model does not meet this job's capability or free-price policy.");
-    return requested;
-  }
-  const families = (process.env.MODEL_PREFERRED_FAMILIES ?? "nemotron,gemma").split(",").map((value) => value.trim().toLowerCase());
-  const ranked = eligible.sort((left, right) => {
-    const leftScore = (families.includes(left.family) ? 4 : 0) + (left.supportsStructuredOutput ? 2 : 0) + (left.id.endsWith(":free") ? 1 : 0);
-    const rightScore = (families.includes(right.family) ? 4 : 0) + (right.supportsStructuredOutput ? 2 : 0) + (right.id.endsWith(":free") ? 1 : 0);
-    return rightScore - leftScore;
-  });
-  if (ranked[0]) return ranked[0];
-  if (policy === "free_only") throw new Error("NO_ELIGIBLE_FREE_MODEL: no live zero-cost OpenRouter model currently supports this job. Retry later or choose an eligible model.");
-  throw new Error("No OpenRouter model currently supports this job.");
+  const candidates = eligibleModels(await getLiveModelCatalog(), role, role === "code" ? 16_000 : 4_000, requestedModelId);
+  if (!candidates.length) throw new Error("NO_ELIGIBLE_FREE_MODEL: no live zero-price model supports this request. Retry later or choose another free model.");
+  return candidates[0];
 }
 
-type ContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+const roleSchemas: Record<string, ZodTypeAny> = {
+  REFERENCE_CLASSIFIER: schemas.referenceClassificationSchema, VISUAL_SPEC: schemas.visualSpecSchema,
+  DESIGN_TOKEN_NORMALIZER: schemas.designTokensSchema, COMPONENT_HIERARCHY: schemas.componentTreeSchema,
+  FILE_PLAN: schemas.filePlanSchema, GENERATE: schemas.generatedProjectSchema, STATIC_REVIEW: schemas.issueListSchema,
+  A11Y_REVIEW: schemas.accessibilityReviewSchema, VISUAL_FIDELITY_REVIEW: schemas.evaluationSchema,
+  REPAIR_PLANNER: schemas.repairPlanSchema, REPAIR_BUILD: schemas.patchSetSchema, REPAIR_VISUAL: schemas.patchSetSchema,
+  REFINEMENT_INTERPRETER: schemas.refinementIntentSchema, USER_REFINEMENT: schemas.patchSetSchema, FINAL_QA: schemas.finalQaSchema,
+};
 
-async function readSseText(response: Response) {
-  if (!response.body) throw new Error("OpenRouter returned no response body.");
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffered = "";
-  let result = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffered += decoder.decode(value, { stream: true });
-    const lines = buffered.split("\n");
-    buffered = lines.pop() ?? "";
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const payload = line.slice(6).trim();
-      if (payload === "[DONE]") continue;
-      try {
-        const parsed = JSON.parse(payload) as { choices?: Array<{ delta?: { content?: string } }> };
-        result += parsed.choices?.[0]?.delta?.content ?? "";
-      } catch {
-        // Partial provider events are intentionally ignored; the final JSON parser is authoritative.
-      }
-    }
-  }
-  return result;
+class ProviderError extends Error {
+  constructor(readonly status: number, readonly retryAfter = 0) { super("OpenRouter could not serve this request (" + status + ")."); }
 }
 
-export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prompt: string; imageDataUrl?: string; imageDataUrls?: string[]; requestedModelId?: string; stream?: boolean; formatRetry?: boolean }) {
-  const candidate = await resolveModel(input.role, input.requestedModelId);
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured.");
-  const content: ContentPart[] = [{ type: "text", text: input.prompt }];
-  for (const imageDataUrl of input.imageDataUrls ?? (input.imageDataUrl ? [input.imageDataUrl] : [])) content.push({ type: "image_url", image_url: { url: imageDataUrl } });
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs());
-  try {
-    const response = await fetch(`${baseUrl()}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER ?? "",
-        "X-Title": process.env.OPENROUTER_APP_TITLE ?? "Screenshot-to-Code Studio",
-      },
-      body: JSON.stringify({
-        model: candidate.id,
-        messages: [{ role: "system", content: sharedSystemPrompt }, { role: "user", content }],
-        temperature: input.role === "vision" ? 0.05 : input.role === "repair" ? 0.2 : 0.15,
-        max_tokens: input.role === "code" ? 16_000 : 6_000,
-        stream: Boolean(input.stream),
-        ...(candidate.supportsStructuredOutput ? { response_format: { type: "json_object" } } : {}),
-      }),
-      signal: controller.signal,
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      const safeBody = (await response.text()).slice(0, 500).replace(/sk-or-v1-[A-Za-z0-9_-]+/g, "[redacted]");
-      throw new Error(`OpenRouter request failed (${response.status}): ${safeBody}`);
-    }
-    const text = input.stream
-      ? await readSseText(response)
-      : ((await response.json()) as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content ?? "";
-    if (!text) throw new Error("OpenRouter returned an empty response.");
+type Completion = { model?: string; error?: { code?: number }; choices?: Array<{ delta?: { content?: string }; message?: { content?: string }; finish_reason?: string }> };
+export async function readCompletion(response: Response, streaming: boolean) {
+  let text = "", modelId = "";
+  const consume = (item: Completion) => {
+    if (item.error) throw new ProviderError(Number(item.error.code) || 502);
+    modelId = item.model ?? modelId;
+    if (item.choices?.[0]?.finish_reason === "length") throw new Error("Model output exceeded the completion budget. Reduce the file plan and retry.");
+    text += item.choices?.[0]?.delta?.content ?? item.choices?.[0]?.message?.content ?? "";
+    if (text.length > 7_500_000) throw new Error("Model output exceeded the safe size limit.");
+  };
+  if (!streaming) consume(await response.json() as Completion);
+  else {
+    if (!response.body) throw new ProviderError(502);
+    const reader = response.body.getReader(), decoder = new TextDecoder();
+    let buffer = "";
+    const line = (value: string) => { if (value.startsWith("data:")) { const payload = value.slice(5).trim(); if (payload && payload !== "[DONE]") consume(JSON.parse(payload) as Completion); } };
     try {
-      return { value: JSON.parse(text) as T, modelId: candidate.id };
-    } catch {
-      if (input.formatRetry) throw new Error("OpenRouter returned invalid JSON after the one permitted format retry.");
-      return structuredOpenRouterCall<T>({ ...input, formatRetry: true, prompt: `${input.prompt}\n\nYour previous response did not match the required JSON schema. Return the same result as one valid JSON object only, with no prose or fences.`, stream: false });
-    }
-  } finally {
-    clearTimeout(timer);
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        const lines = buffer.split("\n"); buffer = lines.pop() ?? "";
+        for (const item of lines) line(item);
+        if (buffer.length > 7_500_000) throw new Error("Invalid provider stream.");
+      }
+      line(buffer + decoder.decode());
+    } finally { await reader.cancel(); }
   }
+  if (!text || !modelId) throw new ProviderError(502);
+  return { text, modelId };
+}
+
+export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prompt: string; imageDataUrl?: string; imageDataUrls?: string[]; requestedModelId?: string; stream?: boolean }) {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured. Add it to the server environment.");
+  const schema = roleSchemas[input.prompt.match(/^ROLE: (\w+)/)?.[1] ?? ""];
+  if (!schema) throw new Error("Unknown prompt contract.");
+  const cacheKey = createHash("sha256").update(JSON.stringify(input)).digest("hex");
+  const cached = await store.checkpoint(cacheKey) as { value: T; modelId: string } | undefined;
+  if (cached) return cached;
+  const schemaText = JSON.stringify(zodToJsonSchema(schema, { $refStrategy: "root" }));
+  const images = input.imageDataUrls ?? (input.imageDataUrl ? [input.imageDataUrl] : []);
+  const role = images.length ? "vision" : input.role;
+  const outputTokens = input.role === "code" ? 16_000 : 6000;
+  const contextTokens = Math.ceil((input.prompt.length + schemaText.length) / 3) + outputTokens + images.length * 2000;
+  const candidates = eligibleModels(await getLiveModelCatalog(), role, contextTokens, input.requestedModelId);
+  if (!candidates.length) throw new Error("NO_ELIGIBLE_FREE_MODEL: no current free model has the required modality and context capacity.");
+  const signal = jobContext.getStore()?.signal;
+  const retries = Math.min(4, Math.max(0, Number(process.env.MAX_MODEL_RETRIES ?? 3)));
+  const started = Date.now();
+  let formatRetry = false;
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries + 1; attempt++) {
+    signal?.throwIfAborted();
+    const available = candidates.filter(candidate => (health.get(candidate.id)?.until ?? 0) <= Date.now());
+    const candidate = available[Math.min(attempt, available.length - 1)];
+    if (!candidate) throw new Error("Free routes are temporarily unhealthy. Retry after their cooldown.");
+    const parameters = new Set(candidate.supportedParameters);
+    const prompt = input.prompt + "\n\nExact JSON schema:\n" + schemaText + (formatRetry ? "\nReturn only schema-valid JSON. Correct the response format; do not add prose or fields." : "");
+    try {
+      const response = await fetch(baseUrl() + "/chat/completions", {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey, "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER ?? "", "X-Title": process.env.OPENROUTER_APP_TITLE ?? "Screenshot-to-Code Studio" },
+        body: JSON.stringify({ model: candidate.id, messages: [{ role: "system", content: sharedSystemPrompt }, { role: "user", content: [{ type: "text", text: prompt }, ...images.map(url => ({ type: "image_url", image_url: { url } }))] }], stream: !!input.stream, max_tokens: outputTokens, ...(parameters.has("temperature") ? { temperature: role === "vision" ? 0.05 : input.role === "review" ? 0 : 0.15 } : {}), ...(parameters.has("response_format") ? { response_format: { type: "json_object" } } : {}), provider: { max_price: { prompt: 0, completion: 0 }, allow_fallbacks: true } }),
+        signal: AbortSignal.any([AbortSignal.timeout(Math.min(120_000, Number(process.env.REQUEST_TIMEOUT_MS ?? 90_000))), ...(signal ? [signal] : [])]), cache: "no-store",
+      });
+      if (!response.ok) throw new ProviderError(response.status, Math.min(30_000, Number(response.headers.get("retry-after") ?? 0) * 1000) || 0);
+      const completion = await readCompletion(response, !!input.stream);
+      let value: T;
+      try { value = schema.parse(JSON.parse(completion.text)) as T; }
+      catch {
+        if (formatRetry) throw new Error("Model response failed its schema after one format retry.");
+        formatRetry = true; continue;
+      }
+      const result = { value, modelId: completion.modelId };
+      health.delete(candidate.id);
+      const context = jobContext.getStore();
+      if (context) {
+        await store.checkpoint(cacheKey, result);
+        const taskJob = await store.getJob(context.jobId, (await store.checkpoint("ownerId")) as string);
+        await store.updateJob(context.jobId, { modelAudit: [...taskJob.modelAudit ?? [], { role: input.role, requestedModelId: input.requestedModelId, routedModelId: candidate.id, resolvedModelId: completion.modelId, durationMs: Date.now() - started, attempts: attempt + 1, createdAt: new Date().toISOString() }] });
+        await store.appendEvent(context.jobId, { type: "model.completed", level: "info", safeMessage: input.role + " completed via " + completion.modelId + (attempt ? " after fallback/retry." : ".") });
+      }
+      return result;
+    } catch (error) {
+      if (signal?.aborted) throw new Error("JOB_CANCELLED");
+      lastError = error;
+      const transient = error instanceof ProviderError ? [408, 429, 500, 502, 503, 504].includes(error.status) : error instanceof TypeError || (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name));
+      if (!transient || attempt >= retries) throw error;
+      const failures = (health.get(candidate.id)?.failures ?? 0) + 1;
+      health.set(candidate.id, { failures, until: failures >= 2 ? Date.now() + 60_000 : 0 });
+      const context = jobContext.getStore();
+      if (context) await store.appendEvent(context.jobId, { type: "model.retry", level: "warning", safeMessage: "Free model temporarily unavailable. Retrying with an eligible free route." });
+      await delay(Math.max(error instanceof ProviderError ? error.retryAfter : 0, Math.min(8000, 500 * 2 ** attempt + Math.random() * 300)), undefined, { signal });
+    }
+  }
+  throw lastError ?? new Error("OpenRouter retry budget exhausted.");
 }

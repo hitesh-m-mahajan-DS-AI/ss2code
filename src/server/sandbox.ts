@@ -1,76 +1,42 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { spawn } from "node:child_process";
 import path from "node:path";
-import { build } from "esbuild";
-import { PNG } from "pngjs";
-import pixelmatch from "pixelmatch";
-import type { FilePlan, ManifestFile } from "@/lib/domain";
-import { assertSafeProjectPath } from "@/lib/security";
+import { randomUUID } from "node:crypto";
+import type { RenderInput, RenderResult } from "./render-project";
+import { jobContext } from "./job-context";
 
-type SandboxResult = { screenshot: Buffer; visualScore: number; visualFindings: Array<{ id: string; severity: "critical" | "high" | "medium" | "low"; region: string; expected: string; observed: string; suggestedDirection: string }> };
-
-function importPath(entry: string) {
-  const withoutExtension = entry.replace(/\.(tsx?|jsx?)$/, "");
-  return `./${withoutExtension}`;
-}
-
-async function materialize(workspace: string, files: ManifestFile[], plan: FilePlan) {
-  for (const file of files) {
-    const safePath = assertSafeProjectPath(file.path);
-    const target = path.join(workspace, safePath);
-    if (!target.startsWith(`${workspace}${path.sep}`)) throw new Error("Sandbox path escaped its workspace.");
-    await mkdir(path.dirname(target), { recursive: true });
-    await writeFile(target, file.content, "utf8");
-  }
-  const entry = assertSafeProjectPath(plan.entry);
-  const generatedEntry = path.join(workspace, "__studio_entry.tsx");
-  await writeFile(generatedEntry, `import React from "react";\nimport { createRoot } from "react-dom/client";\nimport App from "${importPath(entry)}";\ncreateRoot(document.getElementById("root")!).render(<App />);`, "utf8");
-  return generatedEntry;
-}
-
-function comparePngs(reference: Buffer, preview: Buffer) {
-  const left = PNG.sync.read(reference);
-  const right = PNG.sync.read(preview);
-  if (left.width !== right.width || left.height !== right.height) return { score: 0, changed: left.width * left.height };
-  const diff = new PNG({ width: left.width, height: left.height });
-  const changed = pixelmatch(left.data, right.data, diff.data, left.width, left.height, { threshold: 0.16, includeAA: false });
-  return { score: Number((1 - changed / (left.width * left.height)).toFixed(4)), changed };
-}
-
-export async function renderAndCompare(input: { files: ManifestFile[]; plan: FilePlan; referenceDataUrl: string; viewport: { width: number; height: number } }): Promise<SandboxResult> {
-  const workspace = await mkdtemp(path.join(tmpdir(), "ss2-sandbox-"));
-  try {
-    const entry = await materialize(workspace, input.files, input.plan);
-    const output = path.join(workspace, "bundle.js");
-    await build({ entryPoints: [entry], outfile: output, bundle: true, platform: "browser", format: "iife", jsx: "automatic", nodePaths: [path.join(process.cwd(), "node_modules")], logLevel: "silent", loader: { ".svg": "dataurl", ".png": "dataurl", ".jpg": "dataurl", ".jpeg": "dataurl", ".webp": "dataurl" } });
-    const script = await readFile(output, "utf8");
-    let browser: Awaited<ReturnType<(typeof import("playwright"))["chromium"]["launch"]>> | undefined;
-    try {
-      const { chromium } = await import("playwright");
-      browser = await chromium.launch({ headless: true, args: ["--host-resolver-rules=MAP * 0.0.0.0, EXCLUDE localhost"] });
-      const context = await browser.newContext({ viewport: input.viewport, javaScriptEnabled: true });
-      const page = await context.newPage();
-      await page.route("**/*", (route) => route.abort());
-      await page.setContent("<main id=\"root\"></main>");
-      await page.addScriptTag({ content: script });
-      await page.waitForTimeout(80);
-      const preview = await page.screenshot({ type: "png" });
-      const referencePage = await context.newPage();
-      await referencePage.setContent(`<style>html,body{margin:0;padding:0;background:#fff;overflow:hidden}img{display:block;width:${input.viewport.width}px;height:${input.viewport.height}px}</style><img alt=\"Reference\" src=\"${input.referenceDataUrl}\" />`);
-      const reference = await referencePage.screenshot({ type: "png" });
-      await context.close();
-      const { score, changed } = comparePngs(reference, preview);
-      const findings: SandboxResult["visualFindings"] = score < 0.7
-        ? [{ id: "pixel-diff", severity: score < 0.45 ? "critical" : "high", region: "whole page", expected: "Reference geometry and visual treatment", observed: `${Math.round(changed)} pixels differ after thresholding`, suggestedDirection: "Use the side-by-side and overlay comparison to make a targeted geometry, typography, or surface repair." }]
-        : [];
-      return { screenshot: preview, visualScore: score, visualFindings: findings };
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : "Unknown renderer error";
-      throw new Error(`Isolated renderer failed: ${detail}. Install the Playwright Chromium runtime and retry; generated source was not executed outside the browser sandbox.`);
-    } finally {
-      await browser?.close();
-    }
-  } finally {
-    await rm(workspace, { recursive: true, force: true });
-  }
+export async function renderAndCompare(input: RenderInput) {
+  const docker = process.env.SANDBOX_MODE === "docker";
+  if (process.env.NODE_ENV === "production" && !docker) throw new Error("Production rendering requires SANDBOX_MODE=docker and the prepared render image.");
+  const containerName = "ss2-render-" + randomUUID();
+  const executable = docker ? "docker" : process.execPath;
+  const args = docker
+    ? ["run", "--rm", "-i", "--name", containerName, "--network", "none", "--memory", "1g", "--cpus", "1", "--pids-limit", "256", "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--tmpfs", "/tmp:rw,exec,nosuid,size=512m", "-e", "SS2_CONTAINER=1", process.env.SANDBOX_IMAGE ?? "ss2code-render:local"]
+    : ["--max-old-space-size=768", "--import", "tsx", path.join(process.cwd(), "src/workers/render.ts")];
+  const result = await new Promise<RenderResult>((resolve, reject) => {
+    const env: NodeJS.ProcessEnv = { NODE_ENV: "production", ...Object.fromEntries(["PATH", "SystemRoot", "TEMP", "TMP", "USERPROFILE", "HOME", "PLAYWRIGHT_BROWSERS_PATH", "DOCKER_HOST", "DOCKER_CONTEXT"].filter(key => process.env[key]).map(key => [key, process.env[key]!])) };
+    const child = spawn(executable, args, { cwd: process.cwd(), env, windowsHide: true, detached: !docker && process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "", stderr = "";
+    const abort = () => {
+      if (!docker && child.pid && process.platform === "win32") {
+        const cleanup = spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { windowsHide: true, stdio: "ignore" }); cleanup.on("error", () => child.kill());
+      } else if (!docker && child.pid) { try { process.kill(-child.pid, "SIGKILL"); } catch { child.kill(); } }
+      else child.kill();
+      if (docker) { const cleanup = spawn("docker", ["rm", "-f", containerName], { windowsHide: true, stdio: "ignore" }); cleanup.on("error", () => undefined); }
+    };
+    const signal = jobContext.getStore()?.signal;
+    const onAbort = () => { abort(); reject(new Error("JOB_CANCELLED")); };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    const timer = setTimeout(() => { abort(); reject(new Error("Build/render exceeded its 180-second budget.")); }, 180_000);
+    child.stdout.on("data", chunk => { stdout += chunk.toString(); if (stdout.length > 45_000_000) { abort(); reject(new Error("Render output exceeded the size limit.")); } });
+    child.stderr.on("data", chunk => { stderr = (stderr + chunk.toString()).slice(-2000); });
+    child.on("error", reject);
+    child.on("close", () => {
+      clearTimeout(timer); signal?.removeEventListener("abort", onAbort);
+      try { const output = JSON.parse(stdout) as { result?: RenderResult; error?: string }; if (!output.result) throw new Error(output.error ?? "No render result."); resolve(output.result); }
+      catch (error) { reject(new Error(error instanceof SyntaxError ? "Render worker unavailable: " + stderr : String(error))); }
+    });
+    child.stdin.on("error", () => undefined);
+    child.stdin.end(JSON.stringify(input));
+  });
+  return { ...result, screenshot: Buffer.from(result.screenshot, "base64"), diff: Buffer.from(result.diff, "base64") };
 }

@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { analyseAsset } from "@/server/orchestration";
 import { assertIdempotencyKey, assertSameOrigin, jsonForOwner, requestOwner, safeError } from "@/server/http";
+import { visualSpecSchema } from "@/lib/schemas";
+import { store } from "@/server/repository";
 
 export const runtime = "nodejs";
 
@@ -19,4 +21,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch (error) {
     return jsonForOwner(request, { error: safeError(error) }, 400);
   }
+}
+
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
+  try {
+    assertSameOrigin(request); assertIdempotencyKey(request);
+    const spec = visualSpecSchema.parse(await request.json());
+    await store.setSpec((await params).projectId, requestOwner(request).ownerId, spec);
+    return jsonForOwner(request, { spec });
+  } catch (error) { return jsonForOwner(request, { error: safeError(error) }, 400); }
 }

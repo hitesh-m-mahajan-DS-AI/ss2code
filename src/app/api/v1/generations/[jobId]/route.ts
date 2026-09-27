@@ -6,8 +6,6 @@ export const runtime = "nodejs";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ jobId: string }> }) {
   try {
-    assertSameOrigin(request);
-    assertIdempotencyKey(request);
     const owner = requestOwner(request);
     const { jobId } = await params;
     return jsonForOwner(request, { job: await store.getJob(jobId, owner.ownerId) });
@@ -18,11 +16,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ jobId: string }> }) {
   try {
+    assertSameOrigin(request);
+    assertIdempotencyKey(request);
     const owner = requestOwner(request);
     const { jobId } = await params;
     const job = await store.getJob(jobId, owner.ownerId);
+    if (["ready", "failed", "cancelled"].includes(job.phase)) return jsonForOwner(request, { ok: true });
     await store.updateJob(job.id, { phase: "cancelling", cancelledAt: new Date().toISOString() });
-    await store.appendEvent(job.id, { type: "generation.cancelling", level: "warning", safeMessage: "Cancellation requested. The current provider call will finish safely before work stops." });
+    await store.appendEvent(job.id, { type: "generation.cancelling", level: "warning", safeMessage: "Cancellation requested. Active provider and renderer work will stop at the next worker heartbeat." });
     return jsonForOwner(request, { ok: true });
   } catch (error) {
     return jsonForOwner(request, { error: safeError(error) }, 404);

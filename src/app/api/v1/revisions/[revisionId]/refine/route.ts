@@ -13,11 +13,11 @@ const requestSchema = z.object({
 export async function POST(request: NextRequest, { params }: { params: Promise<{ revisionId: string }> }) {
   try {
     assertSameOrigin(request);
-    assertIdempotencyKey(request);
+    const key = assertIdempotencyKey(request);
     const owner = requestOwner(request);
     const { revisionId } = await params;
     const body = requestSchema.parse(await request.json());
-    return jsonForOwner(request, { job: await startRefinement({ revisionId, ownerId: owner.ownerId, ...body }) }, 202);
+    return jsonForOwner(request, { job: await startRefinement({ revisionId, ownerId: owner.ownerId, ...body }, key) }, 202);
   } catch (error) {
     return jsonForOwner(request, { error: safeError(error) }, 400);
   }

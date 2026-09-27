@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ComponentTree } from "./domain";
 
 const confidence = z.enum(["high", "medium", "low"]);
 
@@ -48,7 +49,7 @@ export const designTokensSchema = z.object({
   blurLevels: z.array(z.string().max(100)).max(10),
 }).strict();
 
-export const componentTreeSchema: z.ZodType<{ id: string; type: string; semanticRole: string; visualRegion: string; children: unknown[]; interactions?: string[]; confidence: "high" | "medium" | "low" }> = z.lazy(() => z.object({
+export const componentTreeSchema: z.ZodType<ComponentTree> = z.lazy(() => z.object({
   id: z.string().min(1).max(100),
   type: z.string().min(1).max(100),
   semanticRole: z.string().min(1).max(100),

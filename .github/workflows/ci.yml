@@ -1,0 +1,29 @@
+name: Studio verification
+on:
+  push:
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run typecheck && npm run lint && npm run build
+      - run: docker build -f Dockerfile.render -t ss2code-render:local .
+      - run: npm test
+        env:
+          SANDBOX_MODE: docker
+      - run: npm run test:e2e
+        env:
+          SANDBOX_MODE: docker
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: studio-browser-captures
+          path: .data/test-reports/

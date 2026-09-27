@@ -30,7 +30,11 @@ export type ModelCandidate = {
   isFreeCandidate: boolean;
   promptPrice?: string;
   completionPrice?: string;
+  supportedParameters?: string[];
 };
+
+export type ComponentTree = { id: string; type: string; semanticRole: string; visualRegion: string; children: ComponentTree[]; interactions?: string[]; confidence: "high" | "medium" | "low" };
+export type ModelAudit = { role: ModelRole; requestedModelId?: string; routedModelId: string; resolvedModelId: string; durationMs: number; attempts: number; createdAt: string };
 
 export type VisualSpec = {
   reference: { viewport: { width: number; height: number }; pageType: string; confidence: "high" | "medium" | "low" };
@@ -81,7 +85,7 @@ export type Evaluation = {
   buildFindings: Array<{ id: string; file?: string; category: "parse" | "type" | "lint" | "build" | "runtime"; message: string }>;
   visualFindings: Array<{ id: string; severity: "critical" | "high" | "medium" | "low"; region: string; expected: string; observed: string; suggestedDirection: string }>;
   a11yFindings: Array<{ id: string; severity: string; message: string; target?: string }>;
-  metrics: { visualScore?: number; previousVisualScore?: number; horizontalOverflow: boolean };
+  metrics: { visualScore?: number; previousVisualScore?: number; horizontalOverflow: boolean; regions?: Array<{ region: string; pixelScore: number; geometryScore?: number; textCoverage?: number }>; viewport?: { width: number; height: number }; limitations?: string[]; checks?: string[] };
 };
 
 export type JobEvent = { sequence: number; type: string; level: "info" | "success" | "warning" | "error"; safeMessage: string; createdAt: string };
@@ -99,6 +103,14 @@ export type Revision = {
   summary: string;
   filePlan: FilePlan;
   previewStorageKey?: string;
+  framework?: "react-tailwind" | "nextjs-tailwind";
+  componentTree?: ComponentTree;
+  visualSpec?: VisualSpec;
+  referenceAssetId?: string;
+  jobId?: string;
+  modelAudit?: ModelAudit[];
+  bundleStorageKey?: string;
+  diffStorageKey?: string;
 };
 
 export type GenerationJob = {
@@ -112,6 +124,9 @@ export type GenerationJob = {
   error?: string;
   revisionId?: string;
   cancelledAt?: string;
+  filePlan?: FilePlan;
+  componentTree?: ComponentTree;
+  modelAudit?: ModelAudit[];
 };
 
 export type StoredAsset = {

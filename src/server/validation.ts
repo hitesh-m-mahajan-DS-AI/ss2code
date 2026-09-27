@@ -1,6 +1,7 @@
 import ts from "typescript";
 import type { Evaluation, FilePlan, GeneratedProject, ManifestFile } from "@/lib/domain";
 import { assertSafeProjectPath, sourcePolicyFindings } from "@/lib/security";
+import { assertSourceManifest } from "./scaffold";
 
 const allowedDependencies = ["react", "react-dom", "lucide-react"];
 
@@ -38,6 +39,7 @@ function accessibilityFindings(files: ManifestFile[]) {
 
 export function validateGeneratedProject(project: GeneratedProject, plan: FilePlan): Evaluation {
   const buildFindings: Evaluation["buildFindings"] = [];
+  try { assertSourceManifest(project.files); } catch (error) { buildFindings.push({ id: "manifest-policy", category: "build", message: String(error) }); }
   const plannedPaths = new Set(plan.files.map((file) => file.path));
   const returnedPaths = new Set<string>();
   for (const file of project.files) {

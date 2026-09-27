@@ -2,6 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { NextRequest } from "next/server";
 
 const cookieName = "ss2_owner";
+const requestOwners = new WeakMap<object, { ownerId: string; needsCookie: boolean }>();
 
 function secret() {
   const value = process.env.SESSION_SECRET;
@@ -23,9 +24,13 @@ function validCookie(value: string | undefined) {
 }
 
 export function ownerForRequest(request: NextRequest) {
+  const known = requestOwners.get(request);
+  if (known) return known;
   const current = validCookie(request.cookies.get(cookieName)?.value);
   const ownerId = current ?? randomUUID();
-  return { ownerId, needsCookie: !current };
+  const result = { ownerId, needsCookie: !current };
+  requestOwners.set(request, result);
+  return result;
 }
 
 export function attachOwnerCookie(response: Response, ownerId: string, needsCookie: boolean) {

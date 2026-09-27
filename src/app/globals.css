@@ -46,3 +46,75 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (max-width: 480px) { .studio-shell { padding: 7px; }.topbar { gap: 5px; }.project-title input { font-size: 13px; }.export-button { font-size: 0; }.export-button svg { margin: 0; }.workspace-panel { border-radius: 15px; }.score-row { grid-template-columns: 1fr 1fr; }.score-row .secondary-button { grid-column: 1 / -1; }.code-browser { grid-template-columns: 125px minmax(0, 1fr); }.file-list { padding: 5px; }.code-browser pre { padding: 10px; font-size: 9px; }.command-submit { font-size: 0; padding: 0 10px; }.command-submit svg { margin: 0; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .glass { background: #151b32; }.command-bar { background: #171e36; } }
+
+/* Shared interaction sizing also applies to the compact mobile workspace. */
+.studio-shell button, .studio-shell select, .studio-shell summary, .studio-dialog button, .studio-dialog summary { min-height: 44px; min-width: 44px; }
+.studio-shell summary, .studio-dialog summary { display: list-item; padding: 12px 4px; cursor: pointer; }
+.icon-button, .command-attach, .modal-close { width: 44px; height: 44px; flex-shrink: 0; }
+.model-select { min-height: 44px; }
+.model-select select { min-height: 42px; }
+.topbar { height: auto; min-height: 70px; flex-wrap: wrap; padding-block: 10px; }
+.topbar-actions { flex-wrap: wrap; }
+.workspace { grid-template-columns: minmax(240px,.85fr) minmax(280px,1fr) minmax(360px,1.5fr); height: calc(100dvh - 190px); }
+.live-status { position: relative; left: auto; bottom: auto; max-width: 100%; margin: 0 4px 90px; display: flex; }
+.preview-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.preview-controls label { display: grid; gap: 4px; color: var(--muted); font-size: 11px; flex: 1; min-width: 90px; }
+.preview-controls select { border: 1px solid var(--line); border-radius: 10px; background: #141b31; color: var(--text); width: 100%; padding: 4px; }
+.preview-controls button { align-self: end; }
+.preview-tabs { flex-wrap: wrap; }
+.preview-tabs button { padding: 6px; }
+.preview-host { overflow: hidden; min-height: 310px; border: 1px solid var(--line); border-radius: 14px; background: #0b1020; }
+.live-preview-scroll { overflow: auto; max-height: 65vh; }
+.static-comparison { position: relative; width: 100%; background: white; }
+.static-comparison img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.static-comparison input { position: absolute; bottom: 15px; left: 10%; width: 80%; min-height: 44px; accent-color: var(--accent); }
+.side-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; }
+.side-comparison figure { margin: 0; min-width: 0; }
+.side-comparison img { width: 100%; height: auto; }
+.side-comparison figcaption { padding: 7px; color: var(--muted); font-size: 11px; }
+.preview-note { font-size: 11px; color: #a6b2cd; line-height: 1.5; }
+.file-tree { overflow: auto; border-right: 1px solid var(--line); padding: 6px; }
+.file-tree ul, .blueprint-tree ul { list-style: none; margin: 0; padding-left: 10px; }
+.file-tree > ul, .blueprint-tree > ul { padding-left: 0; }
+.file-tree button, .blueprint-tree button { background: transparent; color: #cbd5f0; border: 0; border-radius: 8px; text-align: left; width: 100%; overflow-wrap: anywhere; font-size: 11px; }
+.file-tree button.active, .file-tree button:hover { background: rgba(130,119,255,.2); color: white; }
+.file-tree summary { color: #adbaf0; font-size: 11px; }
+.code-content { min-width: 0; display: flex; flex-direction: column; }
+.code-heading { display: flex; align-items: center; gap: 8px; padding: 8px; border-bottom: 1px solid var(--line); }
+.code-heading span { flex: 1; overflow-wrap: anywhere; font-size: 11px; }
+.code-content pre { min-height: 0; flex: 1; }
+.blueprint-tree, .inspector-card, .evaluation-details { margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(5,9,20,.3); font-size: 11px; line-height: 1.5; }
+.blueprint-tree h3, .inspector-card h3 { margin: 0; font-size: 13px; }
+.blueprint-tree small { color: var(--muted); }
+.blueprint-tree code { display: block; overflow-wrap: anywhere; padding: 4px 10px; color: #9bd9e9; }
+.blueprint-tree p { color: var(--muted); }
+.inspector-card button { margin: 4px; overflow-wrap: anywhere; max-width: 100%; }
+.evaluation-details p { color: #b4c1dd; }
+.studio-dialog { color: var(--text); width: min(720px, calc(100vw - 28px)); max-height: 85dvh; overflow: auto; border-radius: 18px; padding: 20px; background: #131b31; }
+.studio-dialog::backdrop { background: rgba(3,6,15,.75); backdrop-filter: blur(8px); }
+.studio-dialog header { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
+.studio-dialog h2 { font-size: 20px; }
+.studio-dialog p, .studio-dialog summary { font-size: 12px; color: #bac7e4; }
+.history-projects { display: flex; flex-wrap: wrap; gap: 6px; }
+.history-list { padding: 0; list-style: none; }
+.history-list li { padding: 12px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+@media (max-width: 1100px) {
+  .workspace { grid-template-columns: minmax(210px,.8fr) minmax(240px,1fr) minmax(300px,1.25fr); }
+  .project-title input { min-width: 110px; }
+}
+@media (max-width: 900px) {
+  .workspace { display: block; height: auto; min-height: 0; padding-bottom: 0; }
+  .mobile-tabs { display: grid; grid-template-columns: repeat(3,1fr); margin: 8px 0; }
+  .workspace-panel { display: none; height: auto; min-height: 520px; max-height: none; }
+  .workspace-panel.mobile-visible { display: block; }
+  .topbar { gap: 8px; }
+  .topbar-actions { width: 100%; margin: 0; justify-content: flex-start; }
+  .topbar-actions .icon-button { display: inline-grid; }
+  .model-select { display: flex; flex: 1; max-width: none; order: 5; width: 100%; flex-basis: 100%; }
+  .model-select select { width: 100%; }
+  .export-button { margin-left: auto; font-size: 12px; }
+  .live-status { display: flex; margin-top: 14px; margin-bottom: 95px; font-size: 12px; }
+  .command-submit { font-size: 12px; }
+  .command-bar { width: calc(100vw - 20px); }
+  .code-browser { grid-template-columns: 125px minmax(0,1fr); height: 440px; }
+}

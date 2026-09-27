@@ -8,11 +8,11 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
   try {
     assertSameOrigin(request);
-    assertIdempotencyKey(request);
+    const key = assertIdempotencyKey(request);
     const owner = requestOwner(request);
     const { projectId } = await params;
     const body = generationRequestSchema.parse(await request.json());
-    const job = await startGeneration({ ...body, projectId, ownerId: owner.ownerId });
+    const job = await startGeneration({ ...body, projectId, ownerId: owner.ownerId }, key);
     return jsonForOwner(request, { job }, 202);
   } catch (error) {
     return jsonForOwner(request, { error: safeError(error) }, 400);
