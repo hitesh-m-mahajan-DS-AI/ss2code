@@ -12,6 +12,8 @@ The product uses **OpenRouter exclusively** for AI access. It is built to work o
 
 For the current implementation's setup, worker/storage deployment, validation commands and operational limits, see [DEPLOYMENT.md](./DEPLOYMENT.md). This README and prompts.md remain the product specifications.
 
+For a step-by-step Windows/VS Code walkthrough, F5 startup, Docker setup and troubleshooting, see [LOCAL_SETUP.md](./LOCAL_SETUP.md).
+
 - Upload or drop a screenshot, a video, a ZIP of assets, or a supported design export.
 - Paste an image from the clipboard, paste an image URL, or paste a page URL for a user-authorized reference capture.
 - Extract representative frames from video and let the user choose the frame or compare multiple states.

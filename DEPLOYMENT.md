@@ -2,6 +2,8 @@
 
 ## Local development
 
+For copy/paste commands, VS Code launch/tasks, the first screenshot-to-export walkthrough and troubleshooting, see [LOCAL_SETUP.md](./LOCAL_SETUP.md).
+
 Use Node.js 24 LTS (minimum 22.13). Install dependencies and the browser:
 
     npm ci
