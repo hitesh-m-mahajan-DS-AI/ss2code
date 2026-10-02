@@ -35,7 +35,11 @@ Completion requires a rendered candidate with no horizontal overflow, serious/cr
 
 Elapsed time includes orchestration, provider fallback and rendering. Provider-attempt telemetry excludes retry sleep in new runs. Resolved models are recorded; free-model availability can change. Report failure category and rate limits alongside quality. The comparator refuses mismatched datasets, code/configuration, environment or case coverage; it shows paired differences without asserting statistical significance.
 
+The adapter now requests native JSON-schema output when `structured_outputs` is advertised, requests JSON-object output where only that mode is available, and validates every result with the local Zod contract. API strict mode is disabled for contracts with optional/recursive fields; local schema validation remains authoritative. Compatible routes must honor the native schema parameter. Advertised reasoning budgets are capped at 2,048 tokens for generation and 1,024 for other stages, or use an explicitly supported low effort. These controls follow [OpenRouter structured output](https://openrouter.ai/docs/guides/features/structured-outputs) and [reasoning metadata](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
+
 Group-bootstrap completion intervals use seed 42 and 2,000 resamples. Fewer than two groups gives no interval; with two to eight groups even a degenerate [1,1] interval is **not evidence of generalization**. Do not count variants or repeats as independent templates.
+
+The [2 October reliability pilot](reports/2026-10-02-reliability-pilot.json) is a reviewed public metadata-only exception to the private-artifact policy: it contains authored case IDs, frozen configuration hashes, model IDs and failure-inclusive results, but no screenshots, generated source, prompts or credentials. All six live attempts failed full acceptance; see [dated evidence](../EVIDENCE.md) for diagnosis and study limitations.
 
 ## Before a publishable experiment
 

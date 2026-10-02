@@ -46,6 +46,6 @@ Read the displayed score as **pixel agreement**, not a guarantee. Regional geome
 - npm run typecheck, npm run lint, npm run build.
 - GitHub Actions repeats verification with the Docker renderer and saves desktop/mobile captures.
 
-As of 2026-10-02, React process rendering and the complete browser/export flow are tested locally. A configured OpenRouter key enabled limited free-only live measurements; screenshot attempts exposed provider/schema/refinement failures, while one document evidence query succeeded. See [portfolio/EVIDENCE.md](./portfolio/EVIDENCE.md), rather than treating these as broad AI-quality validation. The local Docker daemon remains unavailable; container execution needs verification in CI or the configured deployment.
+As of 2026-10-02, React process rendering and the complete browser/export flow are tested locally. GitHub CI passed both jobs for commit `6de2c60`, including container rendering and the browser/export suite, and the local Docker daemon now runs the renderer successfully. A configured OpenRouter key enabled limited free-only live measurements; screenshot attempts exposed provider/schema/refinement failures, while one document evidence query succeeded. See [portfolio/EVIDENCE.md](./portfolio/EVIDENCE.md) for measured quality and limitations.
 
 The portfolio extension adds local operational telemetry, benchmark artifacts, a SQL dashboard, forecasting and document retrieval. See [portfolio/OPERATIONS.md](./portfolio/OPERATIONS.md) for privacy, failure response and the backup/restore procedure.

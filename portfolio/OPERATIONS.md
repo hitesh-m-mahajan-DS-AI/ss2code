@@ -47,4 +47,4 @@ This is an operator procedure, not a claimed completed disaster-recovery exercis
 5. Point an isolated web/worker pair to the restored directory with an appropriate test port. Verify authorized access, preview, history, export and queue recovery. Record recovery time and data loss against your agreed RTO/RPO.
 6. Switch live configuration only after approval and verification; retain the previous private root for rollback. Do not publish copied private artifacts as CI downloads.
 
-No automatic backup service, off-host restore test, public deployment or production SLO has been demonstrated here. The local Docker daemon was unavailable during this release's checks; CI/deployment must exercise the container path before a production claim.
+No automatic backup service, off-host restore test, public deployment or production SLO has been demonstrated here. Docker became available locally on 2026-10-02; local reference renders passed, and both GitHub CI jobs passed for commit `6de2c60`, including Docker-backed verification. Repeat CI for later releases before a production claim.

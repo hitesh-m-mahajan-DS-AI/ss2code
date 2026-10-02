@@ -31,6 +31,7 @@ export type ModelCandidate = {
   promptPrice?: string;
   completionPrice?: string;
   supportedParameters?: string[];
+  reasoning?: { supportedEfforts?: string[] | null; supportsMaxTokens?: boolean; mandatory?: boolean };
 };
 
 export type ComponentTree = { id: string; type: string; semanticRole: string; visualRegion: string; children: ComponentTree[]; interactions?: string[]; confidence: "high" | "medium" | "low" };

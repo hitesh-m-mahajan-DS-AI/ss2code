@@ -1,0 +1,265 @@
+{
+  "recordedAt": "2026-10-02",
+  "kind": "authored-development-pilot",
+  "limitations": [
+    "Two independent template groups, one repeat; not a generalization or winning-lane claim.",
+    "Sequential lane order; dynamic free-provider availability and local host contention confound timing.",
+    "No accepted candidates; conditional quality metrics are unmeasured, not zero.",
+    "Commit identifies the parent; sourceHashes identify the uncommitted frozen reliability patch actually tested.",
+    "Six holdout cases remain unopened."
+  ],
+  "configuration": {
+    "parentCommit": "6de2c6028cbae0597a447064a1413534e2d73016",
+    "datasetHash": "db77c64a6696892ddc2529ff92ae477668cf7e62e188102435e38899a43a711f",
+    "promptVersion": "studio-prompts@1.1.0",
+    "sourceHashes": {
+      "scripts/benchmark.ts": "52b872671f357fc85bc5422787055d84450691954cee247a0cf4106166435715",
+      "scripts/benchmark-fixtures.ts": "3e4d1d5de94e5756a685b7c852cc49a01aa96f6e1848d15e326db75314da8460",
+      "src/lib/prompts.ts": "93368d2897b9e0857af5dd341e2f0f32e0b4a89d6345e4fae77e9ce5841059b8",
+      "src/lib/schemas.ts": "860cae86762af5111f8ca5227045f888061d3dbd3a20b1f61eb46339ca1d4ce0",
+      "src/lib/domain.ts": "cf830446e2abe37e16ca49a8e89dcff92aa4a6799c2d7a68fe15d06ae2218129",
+      "src/server/openrouter.ts": "43fcb5647de26da415ec7bac686409f303d18d90b61e52c135e785c8690a375d",
+      "src/server/validation.ts": "8a151a09abbfbf280112e15c8dfa2de347da782ac2c7ad1d5da1de9484ec9348",
+      "src/server/sandbox.ts": "1412422ea0ec47b268cffc80f03ad615221af76310b363e4673bb1d02ecc03b0",
+      "src/server/render-project.ts": "3b1ca522e843e42e8e40047f003cf947de1d058746c842071c18700434343bda",
+      "src/server/scaffold.ts": "92336845d910514e3d39d9e740cdc06f6636062a4cea9a854b36ba2bb40154ed",
+      "src/server/visual-comparison.ts": "bce7e0162678625d38819f6f6873191fbfebdaf05c4a751b4cc22568c72dfcf9",
+      "src/workers/render.ts": "3e1ecb0bdc777538b09548f5ad1b41a991f44fb975a90fb5b59a9768d51c87d1",
+      "src/evaluation/contracts.ts": "8e1985c73e971bd1e9219aca8b54866761146df34f705e06f591baf75f09104d",
+      "resources/export/react-tailwind.lock.json": "029870a403601db016f4c8fbcbae00182d21e360dea7596a2ca228595a9a3bc5",
+      "resources/export/nextjs-tailwind.lock.json": "6b6e0fc3c2543c42c857ab091c9ebe8a1306a2fb16b8617579680fc4a3463128",
+      "Dockerfile.render": "426a4df63449ff9e867d0b6dd8c8028e697ef5d5002c5c467ae7725bd843e9d3",
+      "tsconfig.json": "c858e53a81e5012a7f74db8f39f8cd9aa78e4f86b5837e77290e0b8eb69b2926",
+      "package.json": "23fdabdec65a71fc05e531e7e6140923d5e6a20d105327d7bcb3e73b12f256f6",
+      "package-lock.json": "57304043acd0a35813a84ae05b340eee1df4a63948d429749e08374a331c6eed"
+    },
+    "routing": {
+      "preferredFamilies": "nemotron,gemma",
+      "retries": "3",
+      "timeoutMs": "90000"
+    },
+    "environment": {
+      "node": "v25.2.0",
+      "platform": "win32",
+      "sandbox": "docker"
+    }
+  },
+  "runs": [
+    {
+      "runId": "c9f00536-bfc7-43af-b784-266190677ed5",
+      "lane": "direct",
+      "startedAt": "2026-10-02T10:24:54.512Z",
+      "results": [
+        {
+          "id": "dashboard-desktop",
+          "group": "dashboard",
+          "category": "dashboard",
+          "lane": "direct",
+          "repeat": 0,
+          "traceId": "c9f00536-bfc7-43af-b784-266190677ed5:dashboard-desktop:0",
+          "completed": false,
+          "firstBuildPassed": true,
+          "durationMs": 72122.1085,
+          "modelIds": [
+            "qwen/qwen3.8-27b:free"
+          ],
+          "repairPasses": 0,
+          "failureCategory": "validation",
+          "failureMessage": "Error: No candidate passed the deterministic gates"
+        },
+        {
+          "id": "table-desktop",
+          "group": "table",
+          "category": "table",
+          "lane": "direct",
+          "repeat": 0,
+          "traceId": "c9f00536-bfc7-43af-b784-266190677ed5:table-desktop:0",
+          "completed": false,
+          "firstBuildPassed": false,
+          "durationMs": 40789.0206,
+          "modelIds": [
+            "qwen/qwen3.8-27b:free"
+          ],
+          "repairPasses": 0,
+          "failureCategory": "validation",
+          "failureMessage": "Error: No candidate passed the deterministic gates"
+        }
+      ],
+      "summary": {
+        "attempts": 2,
+        "independentGroups": 2,
+        "completionRate": 0,
+        "firstBuildRate": 0.5,
+        "completion95Interval": [
+          0,
+          0
+        ],
+        "pixelAgreement": {
+          "value": null,
+          "measured": 0,
+          "total": 2
+        },
+        "geometry": {
+          "value": null,
+          "measured": 0,
+          "total": 2
+        },
+        "textCoverage": {
+          "value": null,
+          "measured": 0,
+          "total": 2
+        },
+        "p95DurationMs": 72122.1085,
+        "failures": {
+          "validation": 2
+        }
+      }
+    },
+    {
+      "runId": "00327d6f-40bf-4a4d-94b4-0437523e3ba4",
+      "lane": "staged",
+      "startedAt": "2026-10-02T10:26:48.673Z",
+      "results": [
+        {
+          "id": "dashboard-desktop",
+          "group": "dashboard",
+          "category": "dashboard",
+          "lane": "staged",
+          "repeat": 0,
+          "traceId": "00327d6f-40bf-4a4d-94b4-0437523e3ba4:dashboard-desktop:0",
+          "completed": false,
+          "firstBuildPassed": false,
+          "durationMs": 157233.308,
+          "modelIds": [
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "nvidia/nemotron-3-super-120b-a12b:free"
+          ],
+          "repairPasses": 0,
+          "failureCategory": "validation",
+          "failureMessage": "Error: No candidate passed the deterministic gates"
+        },
+        {
+          "id": "table-desktop",
+          "group": "table",
+          "category": "table",
+          "lane": "staged",
+          "repeat": 0,
+          "traceId": "00327d6f-40bf-4a4d-94b4-0437523e3ba4:table-desktop:0",
+          "completed": false,
+          "firstBuildPassed": false,
+          "durationMs": 5531.139000000025,
+          "modelIds": [],
+          "repairPasses": 0,
+          "failureCategory": "VISUAL_SPEC",
+          "failureMessage": "Error: OpenRouter could not serve this request (400)."
+        }
+      ],
+      "summary": {
+        "attempts": 2,
+        "independentGroups": 2,
+        "completionRate": 0,
+        "firstBuildRate": 0,
+        "completion95Interval": [
+          0,
+          0
+        ],
+        "pixelAgreement": {
+          "value": null,
+          "measured": 0,
+          "total": 2
+        },
+        "geometry": {
+          "value": null,
+          "measured": 0,
+          "total": 2
+        },
+        "textCoverage": {
+          "value": null,
+          "measured": 0,
+          "total": 2
+        },
+        "p95DurationMs": 157233.308,
+        "failures": {
+          "validation": 1,
+          "VISUAL_SPEC": 1
+        }
+      }
+    },
+    {
+      "runId": "8071cc73-11d9-403e-b458-24e4166766ab",
+      "lane": "repair",
+      "startedAt": "2026-10-02T10:29:32.813Z",
+      "results": [
+        {
+          "id": "dashboard-desktop",
+          "group": "dashboard",
+          "category": "dashboard",
+          "lane": "repair",
+          "repeat": 0,
+          "traceId": "8071cc73-11d9-403e-b458-24e4166766ab:dashboard-desktop:0",
+          "completed": false,
+          "firstBuildPassed": false,
+          "durationMs": 5297.2034,
+          "modelIds": [],
+          "repairPasses": 0,
+          "failureCategory": "VISUAL_SPEC",
+          "failureMessage": "Error: OpenRouter could not serve this request (429)."
+        },
+        {
+          "id": "table-desktop",
+          "group": "table",
+          "category": "table",
+          "lane": "repair",
+          "repeat": 0,
+          "traceId": "8071cc73-11d9-403e-b458-24e4166766ab:table-desktop:0",
+          "completed": false,
+          "firstBuildPassed": false,
+          "durationMs": 394349.98860000004,
+          "modelIds": [
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "nvidia/nemotron-3-super-120b-a12b:free"
+          ],
+          "repairPasses": 0,
+          "failureCategory": "REPAIR_BUILD",
+          "failureMessage": "Error: OpenRouter could not serve this request (429)."
+        }
+      ],
+      "summary": {
+        "attempts": 2,
+        "independentGroups": 2,
+        "completionRate": 0,
+        "firstBuildRate": 0,
+        "completion95Interval": [
+          0,
+          0
+        ],
+        "pixelAgreement": {
+          "value": null,
+          "measured": 0,
+          "total": 2
+        },
+        "geometry": {
+          "value": null,
+          "measured": 0,
+          "total": 2
+        },
+        "textCoverage": {
+          "value": null,
+          "measured": 0,
+          "total": 2
+        },
+        "p95DurationMs": 394349.98860000004,
+        "failures": {
+          "VISUAL_SPEC": 1,
+          "REPAIR_BUILD": 1
+        }
+      }
+    }
+  ]
+}

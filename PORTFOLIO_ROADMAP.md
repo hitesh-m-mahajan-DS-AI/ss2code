@@ -14,7 +14,8 @@ Checked means the implementation/tooling is delivered, not that production readi
 
 ## External validation / follow-on work
 
-- [ ] Docker-backed execution on a running daemon and remote CI confirmation.
+- [x] Docker-backed execution on a running daemon and remote CI confirmation: both jobs passed for commit `6de2c60`; local Docker rendering also passed two oracle references on 2026-10-02.
+- [x] Small frozen post-fix live pilot across direct/staged/repair lanes: six attempts, no full acceptance; sanitized report and diagnoses retained without tuning on holdout.
 - [ ] Larger frozen live-model study when free-provider availability permits; unopened screenshot holdout stays sealed.
 - [ ] Consented human usability/fidelity study; recruitment and data collection have not happened.
 - [ ] Approved public deployment and off-host backup/restore drill.
@@ -32,3 +33,4 @@ Implementation, automated test results, live provider measurements and human-stu
 | 2026-10-02 | Screenshot fixtures and live pilots; corrected contrast, specialist routing and optional-refinement retention | Benchmark run IDs in EVIDENCE.md | Oracle success is not AI accuracy; live failures retained |
 | 2026-10-02 | Trained/served/monitored forecasting model and evaluated retrieval | Committed JSON reports | Historical forecast undercoverage; tiny authored retrieval set |
 | 2026-10-02 | Build, browser/export, SQL, accessibility and lifecycle verification | Tests and EVIDENCE.md | Docker daemon unavailable; no public deployment claim |
+| 2026-10-02 | Reliability follow-up: local Docker rendering, remote CI, native schema controls, bounded reasoning and independent retry budgets | 22 Node tests, Docker browser/export checks, CI run 36992716170 | Live generation quality remains gated; public deployment and restore drill pending |
