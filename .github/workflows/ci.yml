@@ -19,6 +19,10 @@ jobs:
       - run: npm test
         env:
           SANDBOX_MODE: docker
+      - run: npm run documents -- index && npm run documents -- evaluate --check
+      - run: npm run benchmark:fixtures && npm run benchmark:run -- --lane self-test --limit 2
+        env:
+          SANDBOX_MODE: docker
       - run: npm run test:e2e
         env:
           SANDBOX_MODE: docker
@@ -27,3 +31,15 @@ jobs:
         with:
           name: studio-browser-captures
           path: .data/test-reports/
+  forecasting:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: portfolio/forecasting/requirements.txt
+      - run: pip install -r portfolio/forecasting/requirements.txt
+      - run: python -m unittest discover -s portfolio/forecasting -p 'test_*.py' -v

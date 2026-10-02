@@ -8,6 +8,8 @@ import { renderAndCompare } from "./sandbox";
 import { jobContext } from "./job-context";
 import { compareImages } from "./visual-comparison";
 import { assertSourceManifest } from "./scaffold";
+import { measured, traceContext } from "./telemetry";
+import { randomUUID } from "node:crypto";
 
 type GenerationInput = { projectId: string; ownerId: string; assetId: string; visualSpec: VisualSpec; framework: "react-tailwind" | "nextjs-tailwind"; targetViewport: { width: number; height: number }; modelId?: string };
 type RefinementInput = { revisionId: string; ownerId: string; userIntent: string; lockedRegions: Array<{ label: string; bounds: [number, number, number, number] }> };
@@ -18,6 +20,10 @@ async function active(jobId: string, ownerId: string) {
 }
 
 export async function analyseAsset(input: { projectId: string; assetId: string; ownerId: string; userIntent?: string; lockedRegions?: Array<{ label: string; bounds: [number, number, number, number] }> }) {
+  return traceContext.run({ id: randomUUID(), source: "studio", projectId: input.projectId }, () => measured("analysis", () => analyseAssetInternal(input)));
+}
+
+async function analyseAssetInternal(input: { projectId: string; assetId: string; ownerId: string; userIntent?: string; lockedRegions?: Array<{ label: string; bounds: [number, number, number, number] }> }) {
   const asset = await store.getProjectReference(input.projectId, input.ownerId, input.assetId);
   const imageDataUrl = "data:" + asset.mimeType + ";base64," + (await store.readAssetBytes(asset)).toString("base64");
   const classification = await structuredOpenRouterCall({ role: "vision", imageDataUrl, prompt: classifierPrompt({ kind: asset.kind, width: asset.width, height: asset.height, mimeType: asset.mimeType }) });
@@ -62,7 +68,7 @@ async function evaluate(project: GeneratedProject, plan: FilePlan, input: Genera
   const evaluation = validateGeneratedProject(project, plan);
   if (evaluation.buildFindings.length) throw new Error(JSON.stringify(evaluation.buildFindings));
   assertSourceManifest(project.files);
-  const render = await renderAndCompare({ files: project.files, plan, referenceDataUrl, viewport: input.targetViewport, visualSpec: input.visualSpec, framework: input.framework });
+  const render = await measured("build_render_evaluate", () => renderAndCompare({ files: project.files, plan, referenceDataUrl, viewport: input.targetViewport, visualSpec: input.visualSpec, framework: input.framework }));
   evaluation.a11yFindings.push(...render.a11yFindings);
   evaluation.visualFindings = render.visualFindings;
   evaluation.metrics = render.metrics;
@@ -145,8 +151,8 @@ async function runGeneration(jobId: string, input: GenerationInput) {
     await active(jobId, input.ownerId);
     await store.updateJob(jobId, { phase: "refining" });
     await event(jobId, "refinement.started", "Refining measured differences, pass " + pass + " of " + max + ".");
-    const candidate = await repair(project, plan, input, checked.evaluation, "visual", referenceDataUrl, pass);
     try {
+      const candidate = await repair(project, plan, input, checked.evaluation, "visual", referenceDataUrl, pass);
       const next = await evaluate(candidate, plan, input, referenceDataUrl);
       await visualReview(next.evaluation, next.render, input, referenceDataUrl);
       if (hardGate(next.evaluation) || next.render.visualScore < checked.render.visualScore) throw new Error("A hard gate failed or pixel agreement declined.");

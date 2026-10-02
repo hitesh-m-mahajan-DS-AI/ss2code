@@ -1,0 +1,195 @@
+{
+  "createdAt": "2026-10-02T00:19:31.218Z",
+  "mode": "lexical retrieval-only; no LLM answers evaluated",
+  "corpusVersion": "2026-10-02T00:00:46.665Z",
+  "documents": [
+    {
+      "file": "operations.md",
+      "sha256": "0a875a927da442bb4a7f44678dc8ada034461157e44b9c7c9e2a1f5e58f46727"
+    },
+    {
+      "file": "setup.md",
+      "sha256": "3069535257db72b60039e2921d4efee43bada85be1f8d50159ce31e329070d14"
+    },
+    {
+      "file": "validation.md",
+      "sha256": "107604690caf9635dafd042099c80de3630718ddd4c3bec5ff7d36ba66a38e08"
+    }
+  ],
+  "questions": 16,
+  "recallAt3": 1,
+  "mrr": 0.9583333333333334,
+  "unanswerableAbstentionRate": 1,
+  "limitations": "Small authored smoke-evaluation set; not a representative semantic retrieval benchmark. Thresholds are fixed; do not tune on this report.",
+  "results": [
+    {
+      "id": "q01",
+      "question": "Where do I configure OPENROUTER_API_KEY?",
+      "expectedFile": "setup.md",
+      "retrieved": [
+        "setup.md"
+      ],
+      "abstained": false,
+      "reciprocalRank": 1,
+      "latencyMs": 0.2733000000000061
+    },
+    {
+      "id": "q02",
+      "question": "How do I install Chromium?",
+      "expectedFile": "setup.md",
+      "retrieved": [
+        "setup.md"
+      ],
+      "abstained": false,
+      "reciprocalRank": 1,
+      "latencyMs": 0.05679999999998131
+    },
+    {
+      "id": "q03",
+      "question": "Which command starts the persistent generation worker?",
+      "expectedFile": "setup.md",
+      "retrieved": [
+        "setup.md"
+      ],
+      "abstained": false,
+      "reciprocalRank": 1,
+      "latencyMs": 0.0508999999999844
+    },
+    {
+      "id": "q04",
+      "question": "Must I restart after editing .env.local?",
+      "expectedFile": "setup.md",
+      "retrieved": [
+        "setup.md"
+      ],
+      "abstained": false,
+      "reciprocalRank": 1,
+      "latencyMs": 0.0403999999999769
+    },
+    {
+      "id": "q05",
+      "question": "What must a generated revision pass before release?",
+      "expectedFile": "validation.md",
+      "retrieved": [
+        "validation.md"
+      ],
+      "abstained": false,
+      "reciprocalRank": 1,
+      "latencyMs": 0.041299999999978354
+    },
+    {
+      "id": "q06",
+      "question": "Does pixel agreement guarantee unseen mobile states match?",
+      "expectedFile": "validation.md",
+      "retrieved": [
+        "validation.md"
+      ],
+      "abstained": false,
+      "reciprocalRank": 1,
+      "latencyMs": 0.039299999999997226
+    },
+    {
+      "id": "q07",
+      "question": "How do I run an extracted React export?",
+      "expectedFile": "validation.md",
+      "retrieved": [
+        "validation.md"
+      ],
+      "abstained": false,
+      "reciprocalRank": 1,
+      "latencyMs": 0.02780000000001337
+    },
+    {
+      "id": "q08",
+      "question": "What does the Files panel contain?",
+      "expectedFile": "validation.md",
+      "retrieved": [
+        "validation.md"
+      ],
+      "abstained": false,
+      "reciprocalRank": 1,
+      "latencyMs": 0.02209999999999468
+    },
+    {
+      "id": "q09",
+      "question": "What does production rendering require?",
+      "expectedFile": "operations.md",
+      "retrieved": [
+        "validation.md",
+        "operations.md"
+      ],
+      "abstained": false,
+      "reciprocalRank": 0.5,
+      "latencyMs": 0.044900000000012597
+    },
+    {
+      "id": "q10",
+      "question": "How often does the worker renew its lease?",
+      "expectedFile": "operations.md",
+      "retrieved": [
+        "operations.md"
+      ],
+      "abstained": false,
+      "reciprocalRank": 1,
+      "latencyMs": 0.0368999999999744
+    },
+    {
+      "id": "q11",
+      "question": "Where are private references and revisions stored?",
+      "expectedFile": "operations.md",
+      "retrieved": [
+        "operations.md"
+      ],
+      "abstained": false,
+      "reciprocalRank": 1,
+      "latencyMs": 0.030699999999995953
+    },
+    {
+      "id": "q12",
+      "question": "Can clearing the ownership cookie lose access?",
+      "expectedFile": "operations.md",
+      "retrieved": [
+        "operations.md"
+      ],
+      "abstained": false,
+      "reciprocalRank": 1,
+      "latencyMs": 0.0262000000000171
+    },
+    {
+      "id": "q13",
+      "question": "What is the population of Neptune?",
+      "expectedFile": null,
+      "retrieved": [],
+      "abstained": true,
+      "reciprocalRank": 0,
+      "latencyMs": 0.01979999999997517
+    },
+    {
+      "id": "q14",
+      "question": "Who won the Wimbledon championship?",
+      "expectedFile": null,
+      "retrieved": [],
+      "abstained": true,
+      "reciprocalRank": 0,
+      "latencyMs": 0.02230000000000132
+    },
+    {
+      "id": "q15",
+      "question": "Translate a poem into Japanese.",
+      "expectedFile": null,
+      "retrieved": [],
+      "abstained": true,
+      "reciprocalRank": 0,
+      "latencyMs": 0.022199999999998
+    },
+    {
+      "id": "q16",
+      "question": "Calculate the orbital eccentricity of Mars.",
+      "expectedFile": null,
+      "retrieved": [],
+      "abstained": true,
+      "reciprocalRank": 0,
+      "latencyMs": 0.021399999999999864
+    }
+  ]
+}

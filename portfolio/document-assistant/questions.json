@@ -1,0 +1,18 @@
+[
+  {"id":"q01","question":"Where do I configure OPENROUTER_API_KEY?","expectedFile":"setup.md"},
+  {"id":"q02","question":"How do I install Chromium?","expectedFile":"setup.md"},
+  {"id":"q03","question":"Which command starts the persistent generation worker?","expectedFile":"setup.md"},
+  {"id":"q04","question":"Must I restart after editing .env.local?","expectedFile":"setup.md"},
+  {"id":"q05","question":"What must a generated revision pass before release?","expectedFile":"validation.md"},
+  {"id":"q06","question":"Does pixel agreement guarantee unseen mobile states match?","expectedFile":"validation.md"},
+  {"id":"q07","question":"How do I run an extracted React export?","expectedFile":"validation.md"},
+  {"id":"q08","question":"What does the Files panel contain?","expectedFile":"validation.md"},
+  {"id":"q09","question":"What does production rendering require?","expectedFile":"operations.md"},
+  {"id":"q10","question":"How often does the worker renew its lease?","expectedFile":"operations.md"},
+  {"id":"q11","question":"Where are private references and revisions stored?","expectedFile":"operations.md"},
+  {"id":"q12","question":"Can clearing the ownership cookie lose access?","expectedFile":"operations.md"},
+  {"id":"q13","question":"What is the population of Neptune?","expectedFile":null},
+  {"id":"q14","question":"Who won the Wimbledon championship?","expectedFile":null},
+  {"id":"q15","question":"Translate a poem into Japanese.","expectedFile":null},
+  {"id":"q16","question":"Calculate the orbital eccentricity of Mars.","expectedFile":null}
+]

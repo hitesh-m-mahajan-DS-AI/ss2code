@@ -14,6 +14,8 @@ For the current implementation's setup, worker/storage deployment, validation co
 
 For a step-by-step Windows/VS Code walkthrough, F5 startup, Docker setup and troubleshooting, see [LOCAL_SETUP.md](./LOCAL_SETUP.md).
 
+For the four-track AI/ML/data-analytics portfolio extension, runnable experiments and measured results, see [portfolio/README.md](./portfolio/README.md) and [portfolio/EVIDENCE.md](./portfolio/EVIDENCE.md). These implementation records distinguish tested capabilities from the product vision below.
+
 - Upload or drop a screenshot, a video, a ZIP of assets, or a supported design export.
 - Paste an image from the clipboard, paste an image URL, or paste a page URL for a user-authorized reference capture.
 - Extract representative frames from video and let the user choose the frame or compare multiple states.

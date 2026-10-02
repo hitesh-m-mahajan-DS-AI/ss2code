@@ -19,7 +19,7 @@ test("OpenRouter retries a transient failure via a free fallback and records the
   try {
     await getLiveModelCatalog(true);
     const result = await structuredOpenRouterCall({ role: "vision", prompt: "ROLE: REFERENCE_CLASSIFIER\nInspect the image." });
-    assert.deepEqual(routes, ["openrouter/free", "google/gemma-test:free"]);
+    assert.deepEqual(routes, ["google/gemma-test:free", "openrouter/free"]);
     assert.equal(result.modelId, "google/gemma-resolved:free");
   } finally { globalThis.fetch = original; if (key === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = key; }
 });

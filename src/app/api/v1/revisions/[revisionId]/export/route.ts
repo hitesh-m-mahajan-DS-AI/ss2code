@@ -4,6 +4,8 @@ import { assertSafeProjectPath } from "@/lib/security";
 import { requestOwner, safeError, assertSameOrigin, assertIdempotencyKey } from "@/server/http";
 import { store } from "@/server/repository";
 import { scaffoldProject } from "@/server/scaffold";
+import { recordSpan, traceContext } from "@/server/telemetry";
+import { randomUUID } from "node:crypto";
 
 export const runtime = "nodejs";
 
@@ -17,11 +19,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!revision.bundleStorageKey) throw new Error("Generate a revision with full build validation before exporting.");
     const files = scaffoldProject(revision.files, revision.filePlan, revision.framework);
     const archive = archiver("zip", { zlib: { level: 9 } });
+    const exportId = randomUUID(), started = performance.now();
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         archive.on("data", (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
         archive.on("error", (error: Error) => controller.error(error));
-        archive.on("end", () => controller.close());
+        archive.on("end", () => {
+          traceContext.run({ id: exportId, source: "studio", projectId: revision.projectId }, () => recordSpan({ stage: "export_built", outcome: "ok", durationMs: performance.now() - started }));
+          controller.close();
+        });
         for (const file of files) archive.append(file.content, { name: assertSafeProjectPath(file.path), mode: 0o600 });
         void archive.finalize();
       },

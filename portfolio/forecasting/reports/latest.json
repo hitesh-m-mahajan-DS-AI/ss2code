@@ -1,0 +1,134 @@
+{
+  "run_id": "20261001T235659Z-fd2caece",
+  "dataset_sha256": "a6bcf826782d3c0fbfdcbeead17cd0884185a0dafe8ff10cd48a874ee7ba18be",
+  "created_at": "2026-10-01T23:56:59.185140+00:00",
+  "python": "3.12.14",
+  "versions": {
+    "sklearn": "1.7.2",
+    "numpy": "2.3.3",
+    "pandas": "2.3.3",
+    "joblib": "1.5.2"
+  },
+  "task": "rolling one-day-ahead forecast with yesterday's actual count available; calendar-only future inputs",
+  "rows": 731,
+  "usable_rows": 703,
+  "features": [
+    "lag_1",
+    "lag_7",
+    "mean_7",
+    "mean_28",
+    "weekday",
+    "month_sin",
+    "month_cos",
+    "holiday",
+    "day_index"
+  ],
+  "folds": [
+    {
+      "train_end": "2011-06-10",
+      "validation_start": "2011-06-12",
+      "validation_end": "2011-10-20"
+    },
+    {
+      "train_end": "2011-10-19",
+      "validation_start": "2011-10-21",
+      "validation_end": "2012-02-28"
+    },
+    {
+      "train_end": "2012-02-27",
+      "validation_start": "2012-02-29",
+      "validation_end": "2012-07-08"
+    }
+  ],
+  "training_end": "2012-07-08",
+  "calibration_end": "2012-09-16",
+  "test_start": "2012-09-17",
+  "test_end": "2012-12-31",
+  "validation_fold_mae": {
+    "seasonal_naive": [
+      853.6335877862596,
+      881.9160305343512,
+      1176.4885496183206
+    ],
+    "ridge": [
+      766.6035811610066,
+      633.2371151802412,
+      833.2684389850283
+    ],
+    "boosting": [
+      597.4083403598703,
+      1074.0495571851998,
+      2602.439411680716
+    ]
+  },
+  "selected_model": "ridge",
+  "test_metrics": {
+    "seasonal_naive": {
+      "mae": 1380.122641509434,
+      "rmse": 1976.8988364187892,
+      "wape": 0.2527090217810015
+    },
+    "ridge": {
+      "mae": 957.8784247377785,
+      "rmse": 1335.665496756373,
+      "wape": 0.17539348491222911
+    },
+    "boosting": {
+      "mae": 1457.6332724322758,
+      "rmse": 1788.0273004309795,
+      "wape": 0.266901699394577
+    }
+  },
+  "selected_mae_improvement_vs_naive": 0.3059468804235028,
+  "interval": {
+    "nominal_coverage": 0.9,
+    "observed_test_coverage": 0.7264150943396226,
+    "radius": 1263.2572705837147,
+    "calibration_rows": 70
+  },
+  "weekday_slices": {
+    "0": {
+      "mae": 954.0140080213368,
+      "rmse": 1712.9564993151614,
+      "wape": 0.1878257632566495
+    },
+    "1": {
+      "mae": 1218.3597682893171,
+      "rmse": 1521.5707612917677,
+      "wape": 0.23799807944392037
+    },
+    "2": {
+      "mae": 892.719474439969,
+      "rmse": 1170.4444917790895,
+      "wape": 0.15046002895088184
+    },
+    "3": {
+      "mae": 637.0694664842216,
+      "rmse": 867.5079763121133,
+      "wape": 0.11044638354711316
+    },
+    "4": {
+      "mae": 659.8880559795034,
+      "rmse": 769.965840176438,
+      "wape": 0.11204800588286791
+    },
+    "5": {
+      "mae": 1139.4451502539564,
+      "rmse": 1445.4759804114185,
+      "wape": 0.1976922047493447
+    },
+    "6": {
+      "mae": 1203.910677477242,
+      "rmse": 1535.3106869642365,
+      "wape": 0.25605677568781204
+    }
+  },
+  "limitations": [
+    "Historical 2011\u20132012 data, not a live deployment or demonstrated business savings.",
+    "Sequential residual calibration does not guarantee future coverage under temporal drift.",
+    "Test scores do not select the model; selection uses expanding-window validation only.",
+    "Repeat experiments on this test period invalidate claims of a fresh holdout.",
+    "Daily aggregate data cannot support station-level allocation recommendations."
+  ],
+  "artifact_sha256": "13295f9434af50a2f7efabf095ddada243f20878522d5bd580e83dca501c5806"
+}

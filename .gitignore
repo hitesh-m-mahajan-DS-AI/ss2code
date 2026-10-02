@@ -4,3 +4,8 @@ node_modules/
 .env
 .env.local
 *.tsbuildinfo
+.venv/
+__pycache__/
+*.pyc
+portfolio/**/artifacts/
+portfolio/**/data/raw/
