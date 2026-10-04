@@ -28,7 +28,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           traceContext.run({ id: exportId, source: "studio", projectId: revision.projectId }, () => recordSpan({ stage: "export_built", outcome: "ok", durationMs: performance.now() - started }));
           controller.close();
         });
-        for (const file of files) archive.append(file.content, { name: assertSafeProjectPath(file.path), mode: 0o600 });
+        // The scaffold alone supplies this fixed configuration; AI source still cannot emit dotfiles.
+        for (const file of files) archive.append(file.content, { name: file.path === ".npmrc" ? ".npmrc" : assertSafeProjectPath(file.path), mode: 0o600 });
         void archive.finalize();
       },
       cancel() {

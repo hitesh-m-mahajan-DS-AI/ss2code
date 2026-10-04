@@ -4,12 +4,14 @@
 
 For copy/paste commands, VS Code launch/tasks, the first screenshot-to-export walkthrough and troubleshooting, see [LOCAL_SETUP.md](./LOCAL_SETUP.md).
 
-Use Node.js 24 LTS (minimum 22.13). Install dependencies and the browser:
+Use Node.js 24 or newer; CI uses Node 24. Install dependencies and the browser:
 
     npm ci
     npx playwright install chromium
 
 Copy .env.example to .env.local and set OPENROUTER_API_KEY. No direct provider key is used. Run npm run dev to start both Next.js and the durable generation worker. Open http://localhost:3000.
+
+The combined launcher loads the chosen mode's environment before spawning both children and binds to `127.0.0.1` by default. Keep a stable browser origin for anonymous workspace cookies. Explicit non-loopback `STUDIO_HOST` configuration is a deployment choice, not a local setup requirement; protect it with HTTPS, access controls and network restrictions.
 
 The model catalog is public, so it can load before a key is configured. Actual inference requires the server key. Free routes are checked against the live catalog, including ancillary prices; missing price/capability data is ineligible. Requests also set a zero-price ceiling. Availability and rate limits remain outside the app's control.
 

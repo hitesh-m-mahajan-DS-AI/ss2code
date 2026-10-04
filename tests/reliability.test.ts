@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { PNG } from "pngjs";
@@ -9,8 +9,24 @@ import { jobContext } from "../src/server/job-context";
 import { compareImages } from "../src/server/visual-comparison";
 import { isVerifiedFree, normalizeModel, eligibleModels, readCompletion } from "../src/server/openrouter";
 import { scaffoldProject } from "../src/server/scaffold";
-import { fixturePlan, fixtureFiles } from "./support/fixture";
+import { fixturePlan, fixtureFiles, fixtureSpec } from "./support/fixture";
 import { isPublicIp } from "../src/server/public-image";
+
+test("candidate evidence stays private, ownership-checked and separate from published revisions", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "ss2-evidence-test-")), store = new LocalProjectStore(dir);
+  try {
+    const bytes = PNG.sync.write(new PNG({ width: 20, height: 20 })), ownerId = "evidence-owner", projectId = "evidence-project";
+    await store.createAsset({ ownerId, projectId, name: "Fixture", kind: "image", mimeType: "image/png", bytes: bytes.length, bytesData: bytes });
+    const job = await store.createJob(projectId, ownerId);
+    const input = { project: { files: fixtureFiles, summary: "Fixture", interactionNotes: [], assumptionsApplied: [] }, plan: fixturePlan, visualSpec: fixtureSpec, evaluation: { buildFindings: [], visualFindings: [], a11yFindings: [], metrics: { horizontalOverflow: false } }, promptVersion: "fixture-not-inference" };
+    const key = await store.saveCandidateEvidence(job.id, ownerId, input, { screenshot: bytes, diff: bytes });
+    assert.ok(key.startsWith("candidates/" + job.id + "/"));
+    assert.equal(JSON.parse(await readFile(path.join(dir, key, "metadata.json"), "utf8")).status, "diagnostic-not-published");
+    assert.deepEqual(await readFile(path.join(dir, key, "capture.png")), bytes);
+    assert.equal((await store.listRevisions(projectId, ownerId)).length, 0);
+    await assert.rejects(store.saveCandidateEvidence(job.id, "different-owner", input), /denied/);
+  } finally { store.close(); await rm(dir, { recursive: true, force: true }); }
+});
 
 test("remote image destinations reject private, mapped, reserved and metadata addresses", () => {
   for (const ip of ["127.0.0.1", "10.2.3.4", "169.254.169.254", "100.64.0.1", "192.168.1.1", "198.18.0.1", "::1", "::ffff:127.0.0.1", "fe80::1", "2001:db8::1"]) assert.equal(isPublicIp(ip), false, ip);

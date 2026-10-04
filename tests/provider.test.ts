@@ -2,6 +2,32 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getLiveModelCatalog, structuredOpenRouterCall } from "../src/server/openrouter";
 
+test("plan-bound generation rejects duplicate files before build and gives one field-level format retry", async () => {
+  const original = globalThis.fetch, key = process.env.OPENROUTER_API_KEY;
+  process.env.OPENROUTER_API_KEY = "test-only-not-a-real-key";
+  const paths = ["src/App.tsx", "src/Header.tsx"], requests: string[] = [];
+  const project = { summary: "Test", files: paths.map(path => ({ path, content: "export default function App(){return <main/>}" })), interactionNotes: [], assumptionsApplied: [] };
+  globalThis.fetch = (async (url, options) => {
+    if (String(url).endsWith("/models")) return Response.json({ data: [{ id: "test/scoped-code:free", pricing: { prompt: "0", completion: "0" }, context_length: 128000, supported_parameters: ["structured_outputs"], architecture: { input_modalities: ["text"], output_modalities: ["text"] } }] });
+    const body = JSON.parse(String(options?.body));
+    assert.equal(body.max_tokens, 16000);
+    assert.match(JSON.stringify(body.response_format), /"enum":\["src\/App.tsx","src\/Header.tsx"\]/);
+    requests.push(body.messages[1].content[0].text);
+    const value = requests.length === 1 ? { ...project, files: [project.files[0], project.files[0]] } : project;
+    return Response.json({ model: body.model, choices: [{ message: { content: JSON.stringify(value) } }] });
+  }) as typeof fetch;
+  try {
+    await getLiveModelCatalog(true);
+    const result = await structuredOpenRouterCall({ role: "code", prompt: "ROLE: GENERATE\nImplement the approved plan.", allowedFilePaths: paths });
+    assert.deepEqual(result.value, project);
+    assert.equal(requests.length, 2);
+    assert.match(requests[1], /Contract failures: files.1.path: custom/);
+  } finally {
+    globalThis.fetch = original;
+    if (key === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = key;
+  }
+});
+
 test("OpenRouter retries a transient failure via a free fallback and records the response model", async () => {
   const original = globalThis.fetch, key = process.env.OPENROUTER_API_KEY;
   const routes: string[] = [];

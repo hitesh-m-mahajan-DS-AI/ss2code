@@ -38,7 +38,7 @@ class ForecastTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.object(forecast, "ROOT", Path(directory)):
             csv = Path(directory) / "fixture.csv"
             dates = pd.date_range("2011-01-01", periods=365)
-            pd.DataFrame({"dteday": dates, "cnt": (100 + np.arange(365) + 20 * (np.arange(365) % 7)).astype(int), "holiday": 0}).to_csv(csv, index=False)
+            pd.DataFrame({"dteday": dates, "cnt": (100 + 20 * (np.arange(365) % 7)).astype(int), "holiday": 0}).to_csv(csv, index=False)
             run = forecast.fit(csv)
             report = json.loads((run / "metrics.json").read_text())
             self.assertLess(report["training_end"], report["calibration_end"])
@@ -51,8 +51,23 @@ class ForecastTests(unittest.TestCase):
             self.assertIn("review_required", forecast.monitor(run, csv))
             self.assertEqual(forecast.promote(run)["active"], run.name)
             self.assertEqual(forecast.promote(run)["history"][-1]["previous"], run.name)
+            # Synthetic metadata defect: the registry must remain unchanged on refusal.
+            registry_before = (Path(directory) / "artifacts/registry.json").read_bytes()
+            report["interval"]["observed_test_coverage"] = .726
+            (run / "metrics.json").write_text(json.dumps(report), encoding="utf8")
+            with self.assertRaisesRegex(ValueError, "Promotion blocked"):
+                forecast.promote(run)
+            self.assertEqual((Path(directory) / "artifacts/registry.json").read_bytes(), registry_before)
             (run / "model.joblib").write_bytes(b"tampered")
             with self.assertRaisesRegex(ValueError, "hash mismatch"): forecast.load_artifact(run)
+
+    def test_promotion_gate_rejects_missing_or_nonfinite_quality(self):
+        good = {"interval": {"observed_test_coverage": .9, "calibration_rows": 30}, "selected_model": "ridge", "test_metrics": {"ridge": {"mae": 2}, "seasonal_naive": {"mae": 3}}}
+        self.assertEqual(forecast.promotion_findings(good), [])
+        self.assertTrue(forecast.promotion_findings({}))
+        for coverage in [None, float("nan"), float("inf"), .726, True]:
+            self.assertTrue(forecast.promotion_findings({**good, "interval": {"observed_test_coverage": coverage, "calibration_rows": 30}}))
+        self.assertTrue(forecast.promotion_findings({**good, "test_metrics": {"ridge": {"mae": 4}, "seasonal_naive": {"mae": 3}}}))
 
 
 if __name__ == "__main__": unittest.main()

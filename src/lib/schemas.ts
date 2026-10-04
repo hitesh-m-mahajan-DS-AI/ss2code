@@ -3,10 +3,16 @@ import type { ComponentTree } from "./domain";
 
 const confidence = z.enum(["high", "medium", "low"]);
 
+export const percentBoundsSchema = z.tuple([
+  z.number().finite().min(0).max(100), z.number().finite().min(0).max(100),
+  z.number().finite().positive().max(100), z.number().finite().positive().max(100),
+]).refine(([x, y, width, height]) => x + width <= 100.01 && y + height <= 100.01, "The [x,y,width,height] box must fit the reference viewport.")
+  .describe("[left x, top y, width, height] in percent of the reference viewport, NOT [x1,y1,x2,y2]. Example: x=35 to x=65 means x=35,width=30. All boxes must fit inside 0–100%.");
+
 export const visualSpecSchema = z.object({
   reference: z.object({ viewport: z.object({ width: z.number().int().positive(), height: z.number().int().positive() }), pageType: z.string().min(1).max(120), confidence }),
   observations: z.object({
-    layout: z.array(z.object({ id: z.string().min(1).max(80), region: z.string().min(1).max(160), boundsPct: z.tuple([z.number(), z.number(), z.number(), z.number()]), description: z.string().max(800), importance: z.enum(["critical", "high", "normal"]) })).max(40),
+    layout: z.array(z.object({ id: z.string().min(1).max(80), region: z.string().min(1).max(160), boundsPct: percentBoundsSchema, description: z.string().max(800), importance: z.enum(["critical", "high", "normal"]) })).min(1).max(40),
     hierarchy: z.array(z.string().max(240)).max(30),
     style: z.object({
       palette: z.array(z.object({ role: z.string().max(80), value: z.string().max(60), confidence })).max(20),
@@ -23,7 +29,13 @@ export const visualSpecSchema = z.object({
   constraints: z.object({ mustMatch: z.array(z.string().max(300)).max(40), mustNotInvent: z.array(z.string().max(300)).max(40), accessibilityRequirements: z.array(z.string().max(300)).max(30) }),
   assumptions: z.array(z.object({ detail: z.string().max(300), conservativeDefault: z.string().max(300), reason: z.string().max(400) })).max(30),
   implementationNotes: z.array(z.string().max(500)).max(30),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  const seen = new Set<string>();
+  value.observations.layout.forEach((region, index) => {
+    if (seen.has(region.id)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["observations", "layout", index, "id"], message: "Visual region IDs must be unique." });
+    seen.add(region.id);
+  });
+});
 
 export const filePlanSchema = z.object({
   entry: z.string().min(1).max(180),

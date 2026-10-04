@@ -1,6 +1,6 @@
-import { componentTreePrompt, classifierPrompt, filePlanPrompt, generationPrompt, PROMPT_VERSION, refinementIntentPrompt, repairPlanPrompt, repairPrompt, reviewPrompt, tokenPrompt, userRefinementPrompt, visualReviewPrompt, visualSpecPrompt } from "@/lib/prompts";
+import { componentTreePrompt, filePlanPrompt, generationPrompt, PROMPT_VERSION, refinementIntentPrompt, repairPlanPrompt, repairPrompt, reviewPrompt, tokenPrompt, userRefinementPrompt, visualReviewPrompt, visualSpecPrompt } from "@/lib/prompts";
 import type { Evaluation, FilePlan, GeneratedProject, ManifestFile, Revision, VisualSpec } from "@/lib/domain";
-import { accessibilityReviewSchema, componentTreeSchema, designTokensSchema, evaluationSchema, filePlanSchema, finalQaSchema, generatedProjectSchema, issueListSchema, patchSetSchema, referenceClassificationSchema, refinementIntentSchema, repairPlanSchema, visualSpecSchema } from "@/lib/schemas";
+import { accessibilityReviewSchema, componentTreeSchema, designTokensSchema, evaluationSchema, filePlanSchema, finalQaSchema, generatedProjectSchema, issueListSchema, patchSetSchema, refinementIntentSchema, repairPlanSchema, visualSpecSchema } from "@/lib/schemas";
 import { structuredOpenRouterCall } from "./openrouter";
 import { store, type TaskInput } from "./repository";
 import { validateGeneratedProject } from "./validation";
@@ -10,6 +10,8 @@ import { compareImages } from "./visual-comparison";
 import { assertSourceManifest } from "./scaffold";
 import { measured, traceContext } from "./telemetry";
 import { randomUUID } from "node:crypto";
+import { hasBlockingFindings, shouldAcceptRepair } from "./quality-gates";
+import { classifyValidatedReference, assertReferenceViewports } from "./reference-classification";
 
 type GenerationInput = { projectId: string; ownerId: string; assetId: string; visualSpec: VisualSpec; framework: "react-tailwind" | "nextjs-tailwind"; targetViewport: { width: number; height: number }; modelId?: string };
 type RefinementInput = { revisionId: string; ownerId: string; userIntent: string; lockedRegions: Array<{ label: string; bounds: [number, number, number, number] }> };
@@ -25,10 +27,9 @@ export async function analyseAsset(input: { projectId: string; assetId: string; 
 
 async function analyseAssetInternal(input: { projectId: string; assetId: string; ownerId: string; userIntent?: string; lockedRegions?: Array<{ label: string; bounds: [number, number, number, number] }> }) {
   const asset = await store.getProjectReference(input.projectId, input.ownerId, input.assetId);
-  const imageDataUrl = "data:" + asset.mimeType + ";base64," + (await store.readAssetBytes(asset)).toString("base64");
-  const classification = await structuredOpenRouterCall({ role: "vision", imageDataUrl, prompt: classifierPrompt({ kind: asset.kind, width: asset.width, height: asset.height, mimeType: asset.mimeType }) });
-  const classified = referenceClassificationSchema.parse(classification.value);
+  const classified = await measured("REFERENCE_CLASSIFIER", async () => classifyValidatedReference(asset));
   if (classified.readiness !== "ready") throw new Error(classified.nextAction);
+  const imageDataUrl = "data:" + asset.mimeType + ";base64," + (await store.readAssetBytes(asset)).toString("base64");
   const analysis = await structuredOpenRouterCall<VisualSpec>({ role: "vision", prompt: visualSpecPrompt({ width: asset.width ?? 1440, height: asset.height ?? 900, assetKind: asset.kind, userIntent: input.userIntent, lockedRegions: input.lockedRegions }), imageDataUrl });
   const spec = visualSpecSchema.parse(analysis.value);
   if (asset.width && asset.height) spec.reference.viewport = { width: asset.width, height: asset.height };
@@ -37,7 +38,10 @@ async function analyseAssetInternal(input: { projectId: string; assetId: string;
 }
 
 export async function startGeneration(input: GenerationInput, key?: string) {
-  await store.getProjectReference(input.projectId, input.ownerId, input.assetId);
+  const asset = await store.getProjectReference(input.projectId, input.ownerId, input.assetId);
+  const classified = classifyValidatedReference(asset);
+  if (classified.readiness !== "ready") throw new Error(classified.nextAction);
+  assertReferenceViewports(asset, input.targetViewport, input.visualSpec.reference.viewport);
   const job = await store.createJob(input.projectId, input.ownerId, { kind: "generation", ownerId: input.ownerId, data: input }, key);
   await store.setSpec(input.projectId, input.ownerId, input.visualSpec);
   return job;
@@ -61,24 +65,33 @@ function applyPatch(files: ManifestFile[], patch: { files: ManifestFile[] }, pla
 }
 
 function hardGate(evaluation: Evaluation) {
-  return evaluation.buildFindings.length > 0 || evaluation.metrics.horizontalOverflow || evaluation.a11yFindings.some(f => ["critical", "serious"].includes(f.severity)) || evaluation.visualFindings.some(f => f.severity === "critical");
+  return hasBlockingFindings(evaluation);
 }
 
 async function evaluate(project: GeneratedProject, plan: FilePlan, input: GenerationInput, referenceDataUrl: string) {
   const evaluation = validateGeneratedProject(project, plan);
-  if (evaluation.buildFindings.length) throw new Error(JSON.stringify(evaluation.buildFindings));
-  assertSourceManifest(project.files);
-  const render = await measured("build_render_evaluate", () => renderAndCompare({ files: project.files, plan, referenceDataUrl, viewport: input.targetViewport, visualSpec: input.visualSpec, framework: input.framework }));
-  evaluation.a11yFindings.push(...render.a11yFindings);
-  evaluation.visualFindings = render.visualFindings;
-  evaluation.metrics = render.metrics;
+  const evidence = (render?: { screenshot: Buffer; diff: Buffer }, error?: unknown) => {
+    const context = jobContext.getStore();
+    return context ? store.saveCandidateEvidence(context.jobId, input.ownerId, { project, plan, visualSpec: input.visualSpec, evaluation, promptVersion: PROMPT_VERSION, ...(error ? { error: String(error).replace(/sk-or-v1-[\w-]+/g, "[redacted]").slice(0, 8000) } : {}) }, render) : Promise.resolve();
+  };
+  let render: Awaited<ReturnType<typeof renderAndCompare>>;
+  try {
+    if (evaluation.buildFindings.length) throw new Error(JSON.stringify(evaluation.buildFindings));
+    assertSourceManifest(project.files);
+    render = await measured("build_render_evaluate", () => renderAndCompare({ files: project.files, plan, referenceDataUrl, viewport: input.targetViewport, visualSpec: input.visualSpec, framework: input.framework }));
+    evaluation.a11yFindings.push(...render.a11yFindings);
+    evaluation.visualFindings = render.visualFindings;
+    evaluation.metrics = render.metrics;
+  } catch (error) { await evidence(undefined, error); throw error; }
+  await evidence(render);
   return { evaluation, render };
 }
 
 async function repair(project: GeneratedProject, filePlan: FilePlan, input: GenerationInput, findings: unknown, mode: "build" | "visual", referenceDataUrl: string, pass = 1) {
-  const planned = await structuredOpenRouterCall({ role: "repair", prompt: repairPlanPrompt({ findings, files: project.files, filePlan }), requestedModelId: input.modelId });
-  const repairPlan = repairPlanSchema.parse(planned.value);
-  const response = await structuredOpenRouterCall({ role: "repair", imageDataUrl: mode === "visual" ? referenceDataUrl : undefined, prompt: repairPrompt({ mode, filePlan, files: project.files, findings: { repairPlan, diagnostics: findings, visualSpec: input.visualSpec }, viewport: input.targetViewport, refinementPass: pass }), requestedModelId: input.modelId });
+  // A single-file compiler failure can go directly to P12; no image is needed for syntax repair.
+  const affected = typeof findings === "string" ? project.files : project.files.filter(file => JSON.stringify(findings).includes(file.path));
+  const repairPlan = affected.length === 1 && mode === "build" ? undefined : repairPlanSchema.parse((await structuredOpenRouterCall({ role: "repair", prompt: repairPlanPrompt({ findings, files: project.files, filePlan }), requestedModelId: input.modelId })).value);
+  const response = await structuredOpenRouterCall({ role: "repair", allowedFilePaths: project.files.filter(f => filePlan.files.some(p => p.path === f.path)).map(f => f.path), imageDataUrl: mode === "visual" ? referenceDataUrl : undefined, prompt: repairPrompt({ mode, filePlan, files: project.files, findings: { repairPlan, diagnostics: findings, visualSpec: input.visualSpec }, viewport: input.targetViewport, refinementPass: pass }), requestedModelId: input.modelId });
   const patch = patchSetSchema.parse(response.value);
   return { ...project, files: applyPatch(project.files, patch, filePlan), assumptionsApplied: [...project.assumptionsApplied, ...patch.assumptionsChanged] };
 }
@@ -125,7 +138,7 @@ async function runGeneration(jobId: string, input: GenerationInput) {
   if (plan.files.some(file => file.visualRegions.some(region => !regions.has(region)))) throw new Error("The file plan refers to a region outside the confirmed specification.");
   await store.updateJob(jobId, { filePlan: plan, componentTree: tree, phase: "generating" });
   await event(jobId, "blueprint.ready", "Blueprint ready: " + plan.files.length + " files. The component and file tree is available.", "success");
-  const generated = await structuredOpenRouterCall<GeneratedProject>({ role: "code", prompt: generationPrompt(input.visualSpec, plan, input.framework, input.targetViewport), requestedModelId: input.modelId, stream: true });
+  const generated = await structuredOpenRouterCall<GeneratedProject>({ role: "code", allowedFilePaths: plan.files.map(f => f.path), imageDataUrl: referenceDataUrl, prompt: generationPrompt(input.visualSpec, plan, input.framework, input.targetViewport), requestedModelId: input.modelId, stream: true });
   let project = generatedProjectSchema.parse(generated.value);
   await store.updateJob(jobId, { modelId: generated.modelId, phase: "validating" });
   await event(jobId, "validation.started", "Compiling, linting, rendering and measuring the generated project.");
@@ -147,7 +160,7 @@ async function runGeneration(jobId: string, input: GenerationInput) {
   await store.updateJob(jobId, { phase: "evaluating" });
   await visualReview(checked.evaluation, checked.render, input, referenceDataUrl);
   const max = Math.min(3, Math.max(0, Number(process.env.MAX_REFINEMENT_ITERATIONS ?? 2)));
-  for (let pass = 1; pass <= max && checked.evaluation.visualFindings.some(f => ["critical", "high"].includes(f.severity)); pass++) {
+  for (let pass = 1; pass <= max && (hardGate(checked.evaluation) || checked.evaluation.visualFindings.some(f => ["critical", "high"].includes(f.severity))); pass++) {
     await active(jobId, input.ownerId);
     await store.updateJob(jobId, { phase: "refining" });
     await event(jobId, "refinement.started", "Refining measured differences, pass " + pass + " of " + max + ".");
@@ -155,7 +168,7 @@ async function runGeneration(jobId: string, input: GenerationInput) {
       const candidate = await repair(project, plan, input, checked.evaluation, "visual", referenceDataUrl, pass);
       const next = await evaluate(candidate, plan, input, referenceDataUrl);
       await visualReview(next.evaluation, next.render, input, referenceDataUrl);
-      if (hardGate(next.evaluation) || next.render.visualScore < checked.render.visualScore) throw new Error("A hard gate failed or pixel agreement declined.");
+      if (!shouldAcceptRepair(checked.evaluation, next.evaluation)) throw new Error("The patch introduced a blocker or did not improve the existing gates/fidelity.");
       next.evaluation.metrics.previousVisualScore = checked.render.visualScore;
       project = candidate; checked = next;
     } catch (error) { await event(jobId, "refinement.reverted", "Patch rejected; keeping the previous candidate. " + String(error).slice(0, 400), "warning"); }
@@ -165,15 +178,18 @@ async function runGeneration(jobId: string, input: GenerationInput) {
 
 async function runRefinement(jobId: string, input: RefinementInput) {
   const parent = await store.getRevision(input.revisionId, input.ownerId);
-  const spec = parent.visualSpec ?? await store.getSpec(parent.projectId, input.ownerId);
-  if (!spec) throw new Error("Reanalyse the reference before refining.");
+  const storedSpec = parent.visualSpec ?? await store.getSpec(parent.projectId, input.ownerId);
+  const parsedSpec = visualSpecSchema.safeParse(storedSpec);
+  if (!parsedSpec.success) throw new Error("Reanalyse the reference before refining: its stored specification does not satisfy the current region-coordinate contract.");
+  const spec = parsedSpec.data;
   const asset = await store.getProjectReference(parent.projectId, input.ownerId, parent.referenceAssetId);
   const generation: GenerationInput = { projectId: parent.projectId, ownerId: input.ownerId, visualSpec: spec, assetId: asset.id, framework: parent.framework ?? "react-tailwind", targetViewport: parent.evaluation.metrics.viewport ?? spec.reference.viewport };
+  assertReferenceViewports(asset, generation.targetViewport, spec.reference.viewport);
   const referenceDataUrl = "data:" + asset.mimeType + ";base64," + (await store.readAssetBytes(asset)).toString("base64");
   await store.updateJob(jobId, { phase: "refining", filePlan: parent.filePlan, componentTree: parent.componentTree });
   const interpretation = refinementIntentSchema.parse((await structuredOpenRouterCall({ role: "blueprint", prompt: refinementIntentPrompt({ ...input, visualSpec: spec }) })).value);
   if (interpretation.conflicts.length || interpretation.requiresReferenceReanalysis || !interpretation.targets.length) throw new Error(interpretation.conflicts.join("; ") || "The request needs a revised scope or reference.");
-  const response = await structuredOpenRouterCall({ role: "repair", prompt: userRefinementPrompt({ ...input, interpretation, visualSpec: spec, currentManifest: parent.files, filePlan: parent.filePlan }) });
+  const response = await structuredOpenRouterCall({ role: "repair", allowedFilePaths: parent.files.map(f => f.path), prompt: userRefinementPrompt({ ...input, interpretation, visualSpec: spec, currentManifest: parent.files, filePlan: parent.filePlan }) });
   const patch = patchSetSchema.parse(response.value);
   if (!patch.files.length) throw new Error(patch.rationale[0]?.unresolvedReason ?? "No bounded change was produced.");
   const project: GeneratedProject = { summary: parent.summary, files: applyPatch(parent.files, patch, parent.filePlan), assumptionsApplied: [...parent.assumptions, ...patch.assumptionsChanged], interactionNotes: [] };

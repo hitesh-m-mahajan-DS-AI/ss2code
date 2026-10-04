@@ -183,7 +183,7 @@ type VisualSpec = {
     layout: Array<{
       id: string;
       region: string;
-      boundsPct: [number, number, number, number];
+      boundsPct: [number, number, number, number]; // [left x, top y, width, height] in viewport percentages; NOT two corners. Positive size, inside 0–100%.
       description: string;
       importance: "critical" | "high" | "normal";
     }>;

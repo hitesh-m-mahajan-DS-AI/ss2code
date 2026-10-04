@@ -205,14 +205,37 @@ def monitor(run: Path, history: Path):
     return {"rows": len(x), "metrics": metrics(actual, prediction), "interval_coverage": coverage, "standardized_mean_shift": shift, "review_required": coverage < .8 or max(shift.values()) > 2, "action": "Review new labelled performance before any retraining or promotion. No automatic retraining.", "evidence": "Historical labelled monitoring batch, not live production telemetry"}
 
 
+def promotion_findings(report: dict) -> list[str]:
+    """Fail-closed local release heuristics; these are not a coverage guarantee."""
+    issues = []
+    interval = report.get("interval", {})
+    def number(value):
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and np.isfinite(value)
+    coverage = interval.get("observed_test_coverage")
+    if not number(coverage) or not .8 <= coverage <= 1:
+        issues.append("Held-out interval coverage must be at least 80%; collect new validation evidence, not test-period tuning")
+    rows = interval.get("calibration_rows")
+    if not isinstance(rows, int) or isinstance(rows, bool) or rows < 30:
+        issues.append("At least 30 calibration observations are required")
+    scores = report.get("test_metrics", {})
+    selected = scores.get(report.get("selected_model"), {}).get("mae")
+    baseline = scores.get("seasonal_naive", {}).get("mae")
+    if not number(selected) or not number(baseline) or selected < 0 or baseline < 0 or selected > baseline:
+        issues.append("Selected held-out MAE must be finite and no worse than seasonal-naive")
+    return issues
+
+
 def promote(run: Path):
     run = run.resolve()
     if run.parent != (ROOT / "artifacts").resolve():
         raise ValueError("Only local versioned artifacts can be promoted")
     _, report = load_artifact(run)
+    issues = promotion_findings(report)
+    if issues:
+        raise ValueError("Promotion blocked: " + "; ".join(issues))
     registry_path = ROOT / "artifacts/registry.json"
     registry = json.loads(registry_path.read_text()) if registry_path.exists() else {"history": []}
-    registry["history"].append({"previous": registry.get("active"), "active": run.name, "at": datetime.now(timezone.utc).isoformat()})
+    registry["history"].append({"previous": registry.get("active"), "active": run.name, "at": datetime.now(timezone.utc).isoformat(), "gate_version": "forecast-release@1.0.0", "evidence_run": report["run_id"], "observed_interval_coverage": report["interval"]["observed_test_coverage"]})
     registry["active"] = run.name
     dump(registry_path, registry)
     return registry
@@ -238,4 +261,9 @@ def main():
         print(json.dumps(result, indent=2))
 
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    try:
+        main()
+    except (ValueError, FileNotFoundError) as error:
+        print(json.dumps({"status": "NOT_READY", "error": str(error)}))
+        raise SystemExit(2)

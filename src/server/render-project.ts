@@ -84,7 +84,7 @@ export async function renderProject(input: RenderInput): Promise<RenderResult> {
     const screenshot = await stableScreenshot(page);
     if (runtimeErrors.length) throw new Error("Browser runtime failure: " + runtimeErrors.join("; ").slice(0, 2000));
     const accessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
-    const a11yFindings = accessibility.violations.map(item => ({ id: item.id, severity: item.impact ?? "moderate", message: item.help, target: item.nodes.map(n => n.target.join(" ")).join(", ").slice(0, 200) }));
+    const a11yFindings = accessibility.violations.map(item => ({ id: item.id + "-" + input.viewport.width, severity: item.impact ?? "moderate", message: (item.help + ": " + (item.nodes[0]?.failureSummary ?? "")).slice(0, 600), target: item.nodes.map(n => n.target.join(" ")).join(", ").slice(0, 200) }));
     const visualFindings: Evaluation["visualFindings"] = [];
     const evidence = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>("[data-ss2-region]")].map(node => {
       const rect = node.getBoundingClientRect();
@@ -103,21 +103,26 @@ export async function renderProject(input: RenderInput): Promise<RenderResult> {
       const geometryScore = node ? Math.max(0, 1 - observed.boundsPct.reduce((sum, value, i) => sum + Math.abs(value - node.bounds[i]), 0) / 100) : 0;
       const textCoverage = visibleText.length ? visibleText.filter(t => node?.text.includes(t.text.replace(/\s+/g, " ").trim())).length / visibleText.length : undefined;
       if (!node || geometryScore < 0.85 || region.pixelScore < 0.7 || (textCoverage !== undefined && textCoverage < 1)) {
-        visualFindings.push({ id: "region-" + region.region, severity: !node && observed.importance === "critical" ? "critical" : "high", region: observed.region, expected: "Match observed bounds " + observed.boundsPct.join(", ") + " and legible text.", observed: node ? "Pixel agreement " + Math.round(region.pixelScore * 100) + "%; geometry " + Math.round(geometryScore * 100) + "%; text coverage " + (textCoverage === undefined ? "not measured" : Math.round(textCoverage * 100) + "%") : "No element maps to this observed region.", suggestedDirection: "Correct only this region's geometry, visible text and styling; preserve matched regions." });
+        const critical = observed.importance === "critical" && (!node || geometryScore < 0.85 || region.pixelScore < 0.7 || (textCoverage !== undefined && textCoverage < 1));
+        visualFindings.push({ id: "region-" + region.region, severity: critical ? "critical" : "high", region: observed.region, expected: "Match observed bounds " + observed.boundsPct.join(", ") + " and legible text.", observed: node ? "Pixel agreement " + Math.round(region.pixelScore * 100) + "%; geometry " + Math.round(geometryScore * 100) + "%; text coverage " + (textCoverage === undefined ? "not measured" : Math.round(textCoverage * 100) + "%") : "No element maps to this observed region.", suggestedDirection: "Correct only this region's geometry, visible text and styling; preserve matched regions." });
       }
       return { ...region, geometryScore, textCoverage };
     });
     let horizontalOverflow = false;
     for (const width of [...new Set([input.viewport.width, 768, 360])]) {
       await page.setViewportSize({ width, height: input.viewport.height });
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
-      if (overflow) {
+      const overflow = await page.evaluate(() => ({ exceeds: document.documentElement.scrollWidth > innerWidth + 1, suspects: [...document.querySelectorAll<HTMLElement>("body *")].filter(node => node.getBoundingClientRect().right > innerWidth + 1).slice(0, 5).map(node => node.tagName.toLowerCase() + (node.id ? "#" + node.id : "") + (node.dataset.ss2Region ? " region=" + node.dataset.ss2Region : "")) }));
+      if (overflow.exceeds) {
         horizontalOverflow = true;
-        visualFindings.push({ id: "overflow-" + width, severity: "critical", region: "viewport " + width, expected: "No horizontal document overflow", observed: "Content exceeds the viewport", suggestedDirection: "Use responsive widths and reflow without changing source hierarchy." });
+        visualFindings.push({ id: "overflow-" + width, severity: "critical", region: "viewport " + width, expected: "No horizontal document overflow", observed: "Content exceeds the viewport: " + overflow.suspects.join(", "), suggestedDirection: "Use min-width:0, responsive widths/wrapping and a local scroll container for dense tables; preserve source hierarchy." });
+      }
+      if (width !== input.viewport.width) {
+        const responsiveA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+        a11yFindings.push(...responsiveA11y.violations.map(item => ({ id: item.id + "-" + width, severity: item.impact ?? "moderate", message: (item.help + ": " + (item.nodes[0]?.failureSummary ?? "")).slice(0, 600), target: item.nodes.map(n => n.target.join(" ")).join(", ").slice(0, 200) })));
       }
     }
     if (runtimeErrors.length) throw new Error("Responsive runtime failure: " + runtimeErrors.join("; "));
-    const metrics: Evaluation["metrics"] = { visualScore: compared.score, horizontalOverflow, regions, viewport: input.viewport, checks: ["TypeScript", "ESLint", "production bundle", "stable render", "runtime errors", "axe accessibility", "360/768/reference overflow"], limitations: ["Pixel agreement is not a guarantee of fidelity.", "Geometry and text checks use the confirmed visual specification; unseen states are not verified.", "Interactions require human review in the live preview."] };
+    const metrics: Evaluation["metrics"] = { visualScore: compared.score, horizontalOverflow, regions, viewport: input.viewport, checks: ["TypeScript", "ESLint", "production bundle", "stable render", "runtime errors", "360/768/reference axe accessibility", "360/768/reference overflow"], limitations: ["Pixel agreement is not a guarantee of fidelity.", "Geometry and text checks use the confirmed visual specification; unseen states are not verified.", "Interactions require human review in the live preview."] };
     return { screenshot: screenshot.toString("base64"), diff: compared.diff.toString("base64"), html, visualScore: compared.score, visualFindings, a11yFindings, metrics };
   } finally {
     await browser?.close();

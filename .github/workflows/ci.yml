@@ -13,6 +13,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npx playwright install --with-deps chromium
       - run: npm run typecheck && npm run lint && npm run build
       - run: docker build -f Dockerfile.render -t ss2code-render:local .

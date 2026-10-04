@@ -1,5 +1,7 @@
 # Screenshot-to-Code Studio
 
+> Implementation status (4 October 2026): locally tested engineering prototype, not a guaranteed pixel-perfect or fully implemented production product. This file and prompts.md define the target specification. See the [measured evidence](portfolio/EVIDENCE.md), [reliability checklist](portfolio/RELIABILITY_CHECKLIST.md) and [remaining boundaries](portfolio/ARCHITECTURE.md) before making portfolio claims.
+
 > Also suitable for a product branded **PixelForge AI**: a reference-to-frontend studio that turns supplied UI evidence into an editable, validated frontend project.
 
 Turn a website screenshot, a short interface video, a design file, or pasted visual reference into clean, runnable frontend code. Screenshot-to-Code is designed for **visual fidelity first**: it reconstructs the supplied interface closely, then improves only the interaction, accessibility, responsiveness, and implementation quality that can be safely inferred from the reference.

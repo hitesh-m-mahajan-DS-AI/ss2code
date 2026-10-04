@@ -3,11 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "overrides": { "braces": "$braces" },
   "scripts": {
     "dev": "node scripts/studio.mjs dev",
     "build": "next build",
     "start": "node scripts/studio.mjs start",
     "worker": "tsx src/workers/jobs.ts",
+    "doctor": "tsx scripts/doctor.ts",
+    "test:live": "tsx scripts/live-smoke.ts",
     "benchmark:fixtures": "tsx scripts/benchmark-fixtures.ts",
     "benchmark:run": "tsx scripts/benchmark.ts",
     "benchmark:compare": "tsx scripts/benchmark-compare.ts",
@@ -15,11 +18,12 @@
     "documents": "tsx portfolio/document-assistant/cli.ts",
     "export:locks": "tsx scripts/export-locks.ts",
     "test:e2e": "tsx tests/studio.e2e.ts",
-    "lint": "eslint src scripts/benchmark.ts scripts/benchmark-fixtures.ts scripts/benchmark-compare.ts scripts/analytics.ts portfolio/document-assistant tests/analytics.test.ts tests/evaluation.test.ts tests/telemetry.test.ts tests/documents.test.ts --max-warnings 0",
+    "lint": "eslint src scripts/benchmark.ts scripts/benchmark-fixtures.ts scripts/benchmark-compare.ts scripts/analytics.ts scripts/doctor.ts scripts/live-smoke.ts portfolio/document-assistant tests/analytics.test.ts tests/evaluation.test.ts tests/telemetry.test.ts tests/documents.test.ts tests/braces.test.ts tests/quality-gates.test.ts tests/output-contract.test.ts --max-warnings 0",
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "braces": "file:vendor/braces",
     "@axe-core/playwright": "^4.13.0",
     "archiver": "^7.0.1",
     "esbuild": "^0.25.8",
@@ -37,6 +41,7 @@
     "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
+    "fill-range": "7.1.1",
     "@eslint/eslintrc": "^3.3.1",
     "@types/archiver": "^6.0.3",
     "@types/node": "^22.15.3",

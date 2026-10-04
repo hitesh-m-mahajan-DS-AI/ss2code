@@ -1,0 +1,1373 @@
+{
+  "recordedAt": "2026-10-04",
+  "kind": "local-engineering-and-real-studio-diagnostics",
+  "parentCommit": "72292fcba110332fa3cd9c12515254b2d7f3fe02",
+  "scope": "Local implementation/testing only; no purchased infrastructure or public deployment.",
+  "limitations": [
+    "Runs are diagnostic iterations, not an unchanged paired experiment or benchmark-lane comparison.",
+    "All failed workflow attempts remain included; no ready/exported revision in these three runs.",
+    "Latest one-case run predeclared zero optional visual-repair passes; required reviews/publication gates were not skipped.",
+    "The final dataset was regenerated after an authored oracle table keyboard-access defect was fixed; the prior dataset and failed instrument run are retained privately.",
+    "Model-produced Visual Spec is submitted automatically without human confirmation. Studio acceptance is not independent visual fidelity.",
+    "Source hashes cover raw workspace bytes and may differ from Git blobs after Windows line-ending normalization. Parent commit is not the tested patch commit.",
+    "Telemetry costs/tokens are provider observations with coverage counts; missing accounting is null, not zero. Infrastructure cost is excluded.",
+    "Candidate metrics are deterministic diagnostics before subsequent model reviews, not accepted-output quality scores.",
+    "Authored small samples, dynamic free routes and congestion do not establish generalization, causal speed or reliability. Six holdout quality cases remain unevaluated.",
+    "Public metadata omits private ownership/project/job IDs, paths, screenshots, source, prompts, raw errors and credentials. Raw evidence remains local and ignored by Git.",
+    "Traceable local evidence is not signed, immutable or tamper-proof."
+  ],
+  "localChecks": {
+    "node": {
+      "tests": 32,
+      "passed": 32,
+      "failed": 0,
+      "renderer": "docker",
+      "nodeVersion": "v25.2.0",
+      "ciNodeMajor": 24
+    },
+    "python": {
+      "tests": 5,
+      "passed": 5,
+      "failed": 0,
+      "pythonVersion": "3.12.14",
+      "environment": "pinned local .venv"
+    },
+    "browserExport": {
+      "status": "passed",
+      "earlierFailure": "Failure-recovery timeout; explicitly synchronized restoration and asserted recovered failed job before rerun.",
+      "scope": [
+        "recovery",
+        "inspector",
+        "history",
+        "compare",
+        "mobile controls",
+        "ZIP download and independent install/build",
+        "ownership",
+        "CSRF",
+        "idempotency",
+        "upload persistence",
+        "video frame selection"
+      ],
+      "notLiveInference": true
+    },
+    "productionBuild": "passed",
+    "typecheck": "passed",
+    "lint": "passed",
+    "dependencyAudit": {
+      "reportedVulnerabilities": 0,
+      "advisory": "GHSA-vfj7-8cjw-p6xm",
+      "mitigation": "Documented bounded MIT local braces fork; no upstream patched version at verification time.",
+      "limitation": "npm audit does not inspect this vendored implementation and is not a security audit."
+    },
+    "environmentDoctor": {
+      "local": "passed",
+      "explicitDockerProduction": "passed",
+      "limitation": "Presence/readiness checks do not verify authentication, quota, image freshness or model accuracy."
+    },
+    "launcher": {
+      "mode": "production",
+      "httpStatus": 200,
+      "webAndWorkerReady": true,
+      "listener": "127.0.0.1:3300",
+      "isolatedStorage": true,
+      "inferenceKeyUsed": false,
+      "stoppedAndPortReleased": true
+    },
+    "forecastPromotion": {
+      "historicalRun": "20261001T235659Z-fd2caece",
+      "observedCoverage": 0.7264150943396226,
+      "nominalCoverage": 0.9,
+      "minimumReleaseHeuristic": 0.8,
+      "status": "NOT_READY",
+      "registryUnchanged": true,
+      "limitation": "Unsafe promotion prevented; historical coverage unchanged and no tuning on its test period."
+    },
+    "documents": {
+      "questions": 16,
+      "mode": "authored lexical retrieval-only smoke test",
+      "recallAt3": 1,
+      "mrr": 0.9583333333333334,
+      "unrelatedAbstention": 1,
+      "semanticOrLiveLlmEvaluation": false
+    }
+  },
+  "runs": [
+    {
+      "runId": "a2be3e9d-4917-48b3-843a-33b6b0279484",
+      "startedAt": "2026-10-04T00:33:36.830Z",
+      "promptVersion": "studio-prompts@1.2.0",
+      "datasetHash": "db77c64a6696892ddc2529ff92ae477668cf7e62e188102435e38899a43a711f",
+      "sourceHashes": {
+        "scripts/live-smoke.ts": "687c111ca40b0e3713f14d47874af40b4f5835e74e0df36c58fef2c96dd0f35c",
+        "src/server/orchestration.ts": "deff82788e6b56522da9611fd8a287841d0cc10258426c8ba698959eb053ee2c",
+        "src/server/openrouter.ts": "3b1bf2fc9c05cb57fff32bae107336799ac1e5c296e0eb6db60527add8dd7c4e",
+        "src/lib/prompts.ts": "d86fb79547bea19c8f5775a14f602b0dfeb77bbbfcef0f463d779115b4c87bcd",
+        "src/lib/schemas.ts": "860cae86762af5111f8ca5227045f888061d3dbd3a20b1f61eb46339ca1d4ce0",
+        "src/lib/domain.ts": "cf830446e2abe37e16ca49a8e89dcff92aa4a6799c2d7a68fe15d06ae2218129",
+        "src/server/quality-gates.ts": "5de0687ff05bef1a7de581d0bfbf23178828fbd25f04218b3f137a78db5c674a",
+        "src/server/render-project.ts": "1363f3741611fbbdee1da23b62494fe4e67c2b03ef17d9a9d97e1164c5d4e8c2",
+        "src/server/scaffold.ts": "83d46033353ee9bb0114af61ba39cba0c3044503f79c3998b015a54171cbab5c",
+        "src/server/validation.ts": "8a151a09abbfbf280112e15c8dfa2de347da782ac2c7ad1d5da1de9484ec9348",
+        "src/server/sandbox.ts": "1412422ea0ec47b268cffc80f03ad615221af76310b363e4673bb1d02ecc03b0",
+        "src/server/visual-comparison.ts": "bce7e0162678625d38819f6f6873191fbfebdaf05c4a751b4cc22568c72dfcf9",
+        "src/server/repository.ts": "0e12cc2e74a7d5df7892ba3e992ee8728018012023dca213b074d744d68f0f1d",
+        "src/server/http.ts": "3f5810c98aeb451059ccede7f4230370fadc3bca980200cecfc8c983365c6f86",
+        "src/workers/jobs.ts": "33ae9776963ba4b9b41b2afeb8dbc6e12139cf5da85bbc8884973b0d94e04120",
+        "src/workers/render.ts": "3e1ecb0bdc777538b09548f5ad1b41a991f44fb975a90fb5b59a9768d51c87d1",
+        "src/app/api/v1/uploads/initiate/route.ts": "00b8a8db68ad8306f1a4d4920abc6f2f8302fe268c1f90269d4599dfbfa0d697",
+        "src/app/api/v1/projects/[projectId]/spec/route.ts": "9390753d47778c9f8d0065a9aeb07cce15f0c58ec33fbb16fde29e920b7ad5c5",
+        "src/app/api/v1/projects/[projectId]/generations/route.ts": "5100f951e53ff94e3c692f4493cb5a259f1c46d82b99ea9e168021f9f10ded19",
+        "src/app/api/v1/revisions/[revisionId]/export/route.ts": "74419b4939671a11ed88246b0d4f56d75243b7c2803b89176398b6721b20ddd4",
+        "resources/export/react-tailwind.lock.json": "2057ee21e7b98b8bd114c2f313cb796c98663bf81e8e6dd103fa852655d4ad3b",
+        "resources/export/nextjs-tailwind.lock.json": "1de22c85db1c925d6c7e5146e64b93f4e8b16082f3d5170525a77b6d17bbc426",
+        ".npmrc": "0ed44e7d606cd7a9eba915a10f13a13a09ea85e4b2bb4415bb0c481dbdcded51",
+        "package.json": "294e0569bdc65a452a41b74919c61880f0a06af78777b150d94e74aba29095d5",
+        "package-lock.json": "08fdb2725c586609d8fe90040605462d70fb3e892384b58b910f0b1a8071a196",
+        "Dockerfile.render": "5de97c1d81b19ec6e4c96a0e07cd6a425e8799f0be82261854b185427dd32a23",
+        "vendor/braces/package.json": "6dd0fd81b0289b65c6acc3988439b32bdd451c1d9dc899e7cedf116bbbe41731",
+        "vendor/braces/index.js": "332ea07c7b006361aad12aa994ca75dc1db8e8382b884909e2f38f10b85c88a4",
+        "vendor/braces/LICENSE": "35bdd8a44339719441900fb50fbefc5e2dca1ca662cbaed7a687de842c8b70f2",
+        "vendor/braces/README.md": "b4563a211ccf1928bb9ea1831a8145681c31f4442482f9811b74ff4bf8b41b7b",
+        "vendor/braces/lib/bounds.js": "b6652b3b8dc21cc5cc9c703bbee2d8f6a7e8729f09205ad565111b75ada2f7bb",
+        "vendor/braces/lib/compile.js": "462771e28ad4b7c34fc7c9e71f1ffb2d2c2b97b176b825c7eab4a524db0673c6",
+        "vendor/braces/lib/constants.js": "c18ac5adb57308f1ce42a28552da3a31f5d83709743ebd9a636336813a744d4b",
+        "vendor/braces/lib/expand.js": "e853a43dfc4c01241123a3d1bb2354c5e176b5cf947f0d0a86b7d051e55ef34b",
+        "vendor/braces/lib/parse.js": "6dd705abd9163dc74250f25d18bc164f1196b3281e4b7e288dc0e650899881d6",
+        "vendor/braces/lib/stringify.js": "8bf9cf5c9a025e04b9afa01a944a4ffa105368e7a8bb0def85a02f547113ef58",
+        "vendor/braces/lib/utils.js": "b5a7596aa67730412b3c029ef09e84e6b67b8e445cffd35d1d295549c89066c7",
+        "src/components/project-tree.tsx": "38f27c9f0699021784332e301321d82b1e7a2658b350ce2b3db5b8725e7a23a5",
+        "src/components/studio.tsx": "d8b614303c6b1f7cdd8f12f15d537c06133d27774e48b76ef492696aa0a571c6",
+        "src/components/preview-workspace.tsx": "951db48abc9c6710262f737cecf2fd3a81e041fb65aabc06b5f841825889b548"
+      },
+      "cases": [
+        "dashboard-desktop",
+        "table-desktop"
+      ],
+      "sandbox": "docker",
+      "environment": {
+        "node": "v25.2.0",
+        "platform": "win32",
+        "rendererImageId": "sha256:835b16b517c7bfc4ea0cb630ff6524b560093d91f133c3d9e5565d49b20b2fc3"
+      },
+      "routing": {
+        "preferredFamilies": "nemotron,gemma",
+        "retries": "3",
+        "timeoutMs": "90000",
+        "maxRefinementIterations": "3",
+        "pricePolicy": "zero-only"
+      },
+      "limitations": [
+        "Authored development references; not real-user, holdout, or generalization evidence.",
+        "Uses the actual upload/analysis/queue/generation/review/export APIs; no oracle source or truth is sent to inference.",
+        "A ready revision is studio-gate acceptance, not independent visual accuracy; inspect the retained captures and findings."
+      ],
+      "results": [
+        {
+          "caseId": "dashboard-desktop",
+          "group": "dashboard",
+          "completed": false,
+          "analysisModel": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "models": [
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "qwen/qwen3.8-27b:free"
+          ],
+          "failurePhase": "generation",
+          "failureCategory": "manifest_scope",
+          "durationMs": 289605,
+          "acceptedQuality": null
+        },
+        {
+          "caseId": "table-desktop",
+          "group": "table",
+          "completed": false,
+          "analysisModel": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "models": [
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+            "qwen/qwen3.8-27b:free"
+          ],
+          "failurePhase": "generation",
+          "failureCategory": "validation_blocked",
+          "durationMs": 738813,
+          "acceptedQuality": null
+        }
+      ],
+      "attempted": 2,
+      "readyAndExported": 0,
+      "telemetry": [
+        {
+          "stage": "A11Y_REVIEW",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 1,
+          "observedTotalTokens": 3844,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "COMPONENT_HIERARCHY",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 2,
+          "observedTotalTokens": 6567,
+          "observedCostCredits": 0,
+          "accountedAttempts": 2
+        },
+        {
+          "stage": "DESIGN_TOKEN_NORMALIZER",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 2,
+          "observedTotalTokens": 6540,
+          "observedCostCredits": 0,
+          "accountedAttempts": 2
+        },
+        {
+          "stage": "FILE_PLAN",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 2,
+          "observedTotalTokens": 8289,
+          "observedCostCredits": 0,
+          "accountedAttempts": 2
+        },
+        {
+          "stage": "GENERATE",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-26b-a4b-it:free",
+          "attempts": 2,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "GENERATE",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-31b-it:free",
+          "attempts": 2,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "GENERATE",
+          "outcome": "error",
+          "errorCode": "HTTP_502",
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "GENERATE",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 1,
+          "observedTotalTokens": 6510,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "GENERATE",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "qwen/qwen3.8-27b:free",
+          "attempts": 1,
+          "observedTotalTokens": 4284,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "GENERATE",
+          "outcome": "schema_error",
+          "errorCode": "SCHEMA_INVALID",
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 1,
+          "observedTotalTokens": 6620,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "REFERENCE_CLASSIFIER",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-26b-a4b-it:free",
+          "attempts": 2,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "REFERENCE_CLASSIFIER",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-31b-it:free",
+          "attempts": 2,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "REFERENCE_CLASSIFIER",
+          "outcome": "error",
+          "errorCode": "HTTP_502",
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "REFERENCE_CLASSIFIER",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 1,
+          "observedTotalTokens": 2330,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "REFERENCE_CLASSIFIER",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "qwen/qwen3.8-27b:free",
+          "attempts": 1,
+          "observedTotalTokens": 2430,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "REPAIR_BUILD",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 1,
+          "observedTotalTokens": 6070,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "REPAIR_PLANNER",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 2,
+          "observedTotalTokens": 9484,
+          "observedCostCredits": 0,
+          "accountedAttempts": 2
+        },
+        {
+          "stage": "REPAIR_VISUAL",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-26b-a4b-it:free",
+          "attempts": 2,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "REPAIR_VISUAL",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-31b-it:free",
+          "attempts": 2,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "REPAIR_VISUAL",
+          "outcome": "error",
+          "errorCode": "TIMEOUT",
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "REPAIR_VISUAL",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 2,
+          "observedTotalTokens": 19620,
+          "observedCostCredits": 0,
+          "accountedAttempts": 2
+        },
+        {
+          "stage": "REPAIR_VISUAL",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "qwen/qwen3.8-27b:free",
+          "attempts": 1,
+          "observedTotalTokens": 11699,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "STATIC_REVIEW",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 1,
+          "observedTotalTokens": 2211,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "VISUAL_FIDELITY_REVIEW",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-26b-a4b-it:free",
+          "attempts": 3,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "VISUAL_FIDELITY_REVIEW",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-31b-it:free",
+          "attempts": 3,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "VISUAL_FIDELITY_REVIEW",
+          "outcome": "error",
+          "errorCode": "HTTP_502",
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "VISUAL_FIDELITY_REVIEW",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 2,
+          "observedTotalTokens": 15285,
+          "observedCostCredits": 0,
+          "accountedAttempts": 2
+        },
+        {
+          "stage": "VISUAL_FIDELITY_REVIEW",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "qwen/qwen3.8-27b:free",
+          "attempts": 1,
+          "observedTotalTokens": 7400,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "VISUAL_SPEC",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-26b-a4b-it:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "VISUAL_SPEC",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-31b-it:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "VISUAL_SPEC",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 2,
+          "observedTotalTokens": 10963,
+          "observedCostCredits": 0,
+          "accountedAttempts": 2
+        },
+        {
+          "stage": "analysis",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": null,
+          "attempts": 2,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "build_render_evaluate",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": null,
+          "attempts": 3,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        }
+      ],
+      "privateCandidateDiagnostics": []
+    },
+    {
+      "runId": "6a1bee37-690c-4253-ac82-a5abd607e962",
+      "startedAt": "2026-10-04T01:04:40.358Z",
+      "promptVersion": "studio-prompts@1.3.0",
+      "datasetHash": "db77c64a6696892ddc2529ff92ae477668cf7e62e188102435e38899a43a711f",
+      "sourceHashes": {
+        "scripts/live-smoke.ts": "b19bdbee09b14dfbe3f9aca843039cd35d66a25719f10149bcd4474bc7fd81cf",
+        "src/server/orchestration.ts": "6038f4c9f90dca2e8f12bf0cc224aac11d4871e25ed9399680990c1c1698a81b",
+        "src/server/openrouter.ts": "adb339905d0f632af458458a62540c17f2b61dd0cd209442fa16cdee00c25d37",
+        "src/lib/prompts.ts": "91a2769e19cf051ee0cca8f84255ee8675d241041648ee8d7453116a28c67d8a",
+        "src/lib/schemas.ts": "860cae86762af5111f8ca5227045f888061d3dbd3a20b1f61eb46339ca1d4ce0",
+        "src/lib/domain.ts": "cf830446e2abe37e16ca49a8e89dcff92aa4a6799c2d7a68fe15d06ae2218129",
+        "src/server/quality-gates.ts": "5de0687ff05bef1a7de581d0bfbf23178828fbd25f04218b3f137a78db5c674a",
+        "src/server/render-project.ts": "1363f3741611fbbdee1da23b62494fe4e67c2b03ef17d9a9d97e1164c5d4e8c2",
+        "src/server/scaffold.ts": "83d46033353ee9bb0114af61ba39cba0c3044503f79c3998b015a54171cbab5c",
+        "src/server/validation.ts": "8a151a09abbfbf280112e15c8dfa2de347da782ac2c7ad1d5da1de9484ec9348",
+        "src/server/sandbox.ts": "1412422ea0ec47b268cffc80f03ad615221af76310b363e4673bb1d02ecc03b0",
+        "src/server/visual-comparison.ts": "bce7e0162678625d38819f6f6873191fbfebdaf05c4a751b4cc22568c72dfcf9",
+        "src/server/repository.ts": "dcf73536fef4100509118a58ba5a7c90b71362c95f3f1434388b1109be3ed6fd",
+        "src/server/http.ts": "3f5810c98aeb451059ccede7f4230370fadc3bca980200cecfc8c983365c6f86",
+        "src/workers/jobs.ts": "33ae9776963ba4b9b41b2afeb8dbc6e12139cf5da85bbc8884973b0d94e04120",
+        "src/workers/render.ts": "3e1ecb0bdc777538b09548f5ad1b41a991f44fb975a90fb5b59a9768d51c87d1",
+        "src/app/api/v1/uploads/initiate/route.ts": "00b8a8db68ad8306f1a4d4920abc6f2f8302fe268c1f90269d4599dfbfa0d697",
+        "src/app/api/v1/projects/[projectId]/spec/route.ts": "9390753d47778c9f8d0065a9aeb07cce15f0c58ec33fbb16fde29e920b7ad5c5",
+        "src/app/api/v1/projects/[projectId]/generations/route.ts": "5100f951e53ff94e3c692f4493cb5a259f1c46d82b99ea9e168021f9f10ded19",
+        "src/app/api/v1/revisions/[revisionId]/export/route.ts": "74419b4939671a11ed88246b0d4f56d75243b7c2803b89176398b6721b20ddd4",
+        "resources/export/react-tailwind.lock.json": "2057ee21e7b98b8bd114c2f313cb796c98663bf81e8e6dd103fa852655d4ad3b",
+        "resources/export/nextjs-tailwind.lock.json": "1de22c85db1c925d6c7e5146e64b93f4e8b16082f3d5170525a77b6d17bbc426",
+        ".npmrc": "0ed44e7d606cd7a9eba915a10f13a13a09ea85e4b2bb4415bb0c481dbdcded51",
+        "package.json": "762b26450da35c42aa21bc54b6d333bbf0c241c83ec9152554cfefe94b960780",
+        "package-lock.json": "08fdb2725c586609d8fe90040605462d70fb3e892384b58b910f0b1a8071a196",
+        "Dockerfile.render": "5de97c1d81b19ec6e4c96a0e07cd6a425e8799f0be82261854b185427dd32a23",
+        "vendor/braces/package.json": "6dd0fd81b0289b65c6acc3988439b32bdd451c1d9dc899e7cedf116bbbe41731",
+        "vendor/braces/index.js": "332ea07c7b006361aad12aa994ca75dc1db8e8382b884909e2f38f10b85c88a4",
+        "vendor/braces/LICENSE": "35bdd8a44339719441900fb50fbefc5e2dca1ca662cbaed7a687de842c8b70f2",
+        "vendor/braces/README.md": "b4563a211ccf1928bb9ea1831a8145681c31f4442482f9811b74ff4bf8b41b7b",
+        "vendor/braces/lib/bounds.js": "b6652b3b8dc21cc5cc9c703bbee2d8f6a7e8729f09205ad565111b75ada2f7bb",
+        "vendor/braces/lib/compile.js": "462771e28ad4b7c34fc7c9e71f1ffb2d2c2b97b176b825c7eab4a524db0673c6",
+        "vendor/braces/lib/constants.js": "c18ac5adb57308f1ce42a28552da3a31f5d83709743ebd9a636336813a744d4b",
+        "vendor/braces/lib/expand.js": "e853a43dfc4c01241123a3d1bb2354c5e176b5cf947f0d0a86b7d051e55ef34b",
+        "vendor/braces/lib/parse.js": "6dd705abd9163dc74250f25d18bc164f1196b3281e4b7e288dc0e650899881d6",
+        "vendor/braces/lib/stringify.js": "8bf9cf5c9a025e04b9afa01a944a4ffa105368e7a8bb0def85a02f547113ef58",
+        "vendor/braces/lib/utils.js": "b5a7596aa67730412b3c029ef09e84e6b67b8e445cffd35d1d295549c89066c7",
+        "src/components/project-tree.tsx": "38f27c9f0699021784332e301321d82b1e7a2658b350ce2b3db5b8725e7a23a5",
+        "src/components/studio.tsx": "d8b614303c6b1f7cdd8f12f15d537c06133d27774e48b76ef492696aa0a571c6",
+        "src/components/preview-workspace.tsx": "951db48abc9c6710262f737cecf2fd3a81e041fb65aabc06b5f841825889b548",
+        "src/server/output-contract.ts": "f068af50b5a6d6feb5f509d59d0b41dc2a92e3b1352357ce889ef2ec77043b5f",
+        "src/server/reference-classification.ts": "b7051b836db9a5573d161c87e8e722d513321c1840377b192b6dac140489655b"
+      },
+      "cases": [
+        "dashboard-desktop",
+        "table-desktop"
+      ],
+      "sandbox": "docker",
+      "environment": {
+        "node": "v25.2.0",
+        "platform": "win32",
+        "rendererImageId": "sha256:0a24b9923d0bfe6deb59f0b27ffbef41e0fc8e4cdb1279c12b95699d7ef76bcb"
+      },
+      "routing": {
+        "preferredFamilies": "nemotron,gemma",
+        "retries": "3",
+        "timeoutMs": "90000",
+        "maxRefinementIterations": "3",
+        "pricePolicy": "zero-only"
+      },
+      "limitations": [
+        "Authored development references; not real-user, holdout, or generalization evidence.",
+        "Uses the actual upload/analysis/queue/generation/review/export APIs; no oracle source or truth is sent to inference.",
+        "The model-produced specification is submitted automatically in this test, without human confirmation.",
+        "A ready revision is studio-gate acceptance, not independent visual accuracy; inspect the retained captures and findings."
+      ],
+      "results": [
+        {
+          "caseId": "dashboard-desktop",
+          "group": "dashboard",
+          "completed": false,
+          "analysisModel": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "models": [
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "qwen/qwen3.8-27b:free",
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+          ],
+          "failurePhase": "generation",
+          "failureCategory": "validation_blocked",
+          "durationMs": 707057,
+          "acceptedQuality": null
+        },
+        {
+          "caseId": "table-desktop",
+          "group": "table",
+          "completed": false,
+          "analysisModel": null,
+          "models": [],
+          "failurePhase": "analysis",
+          "failureCategory": "schema_invalid",
+          "durationMs": 118714,
+          "acceptedQuality": null
+        }
+      ],
+      "attempted": 2,
+      "readyAndExported": 0,
+      "telemetry": [
+        {
+          "stage": "A11Y_REVIEW",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 1,
+          "observedTotalTokens": 3786,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "COMPONENT_HIERARCHY",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 1,
+          "observedTotalTokens": 3346,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "DESIGN_TOKEN_NORMALIZER",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 1,
+          "observedTotalTokens": 3167,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "FILE_PLAN",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 1,
+          "observedTotalTokens": 4013,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "GENERATE",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-26b-a4b-it:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "GENERATE",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-31b-it:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "GENERATE",
+          "outcome": "error",
+          "errorCode": "TIMEOUT",
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "GENERATE",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "qwen/qwen3.8-27b:free",
+          "attempts": 1,
+          "observedTotalTokens": 3975,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "REFERENCE_CLASSIFIER",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": null,
+          "attempts": 2,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "REPAIR_BUILD",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 1,
+          "observedTotalTokens": 5263,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "REPAIR_PLANNER",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 1,
+          "observedTotalTokens": 4556,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "REPAIR_VISUAL",
+          "outcome": "error",
+          "errorCode": "HTTP_502",
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "REPAIR_VISUAL",
+          "outcome": "error",
+          "errorCode": "TIMEOUT",
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "REPAIR_VISUAL",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "qwen/qwen3.8-27b:free",
+          "attempts": 3,
+          "observedTotalTokens": 33322,
+          "observedCostCredits": 0,
+          "accountedAttempts": 3
+        },
+        {
+          "stage": "STATIC_REVIEW",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 1,
+          "observedTotalTokens": 2759,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "VISUAL_FIDELITY_REVIEW",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-26b-a4b-it:free",
+          "attempts": 4,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "VISUAL_FIDELITY_REVIEW",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-31b-it:free",
+          "attempts": 4,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "VISUAL_FIDELITY_REVIEW",
+          "outcome": "error",
+          "errorCode": "HTTP_502",
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "VISUAL_FIDELITY_REVIEW",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 3,
+          "observedTotalTokens": 21233,
+          "observedCostCredits": 0,
+          "accountedAttempts": 3
+        },
+        {
+          "stage": "VISUAL_FIDELITY_REVIEW",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "qwen/qwen3.8-27b:free",
+          "attempts": 1,
+          "observedTotalTokens": 6927,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "VISUAL_SPEC",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-26b-a4b-it:free",
+          "attempts": 2,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "VISUAL_SPEC",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-31b-it:free",
+          "attempts": 2,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "VISUAL_SPEC",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 1,
+          "observedTotalTokens": 5348,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "VISUAL_SPEC",
+          "outcome": "schema_error",
+          "errorCode": "SCHEMA_INVALID",
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 2,
+          "observedTotalTokens": 10639,
+          "observedCostCredits": 0,
+          "accountedAttempts": 2
+        },
+        {
+          "stage": "analysis",
+          "outcome": "error",
+          "errorCode": "STAGE_FAILED",
+          "model": null,
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "analysis",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": null,
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "build_render_evaluate",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": null,
+          "attempts": 4,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        }
+      ],
+      "privateCandidateDiagnostics": [
+        {
+          "status": "diagnostic-not-published",
+          "capturedAt": "2026-10-04T01:08:24.925Z",
+          "promptVersion": "studio-prompts@1.3.0",
+          "phase": "validating",
+          "approvedFileCount": 1,
+          "rendered": true,
+          "rawPixelAgreement": 0.9898619791666666,
+          "horizontalOverflow": false,
+          "buildFindings": 0,
+          "seriousOrCriticalAccessibility": 0,
+          "criticalVisual": 1,
+          "limitation": "Deterministic candidate diagnostic before later model reviews; not a published revision or accepted fidelity score."
+        },
+        {
+          "status": "diagnostic-not-published",
+          "capturedAt": "2026-10-04T01:07:58.245Z",
+          "promptVersion": "studio-prompts@1.3.0",
+          "phase": "validating",
+          "approvedFileCount": 1,
+          "rendered": false,
+          "rawPixelAgreement": null,
+          "horizontalOverflow": false,
+          "buildFindings": 1,
+          "seriousOrCriticalAccessibility": 0,
+          "criticalVisual": 0,
+          "limitation": "Deterministic candidate diagnostic before later model reviews; not a published revision or accepted fidelity score."
+        },
+        {
+          "status": "diagnostic-not-published",
+          "capturedAt": "2026-10-04T01:12:27.136Z",
+          "promptVersion": "studio-prompts@1.3.0",
+          "phase": "refining",
+          "approvedFileCount": 1,
+          "rendered": true,
+          "rawPixelAgreement": 0.9902230902777778,
+          "horizontalOverflow": false,
+          "buildFindings": 0,
+          "seriousOrCriticalAccessibility": 0,
+          "criticalVisual": 2,
+          "limitation": "Deterministic candidate diagnostic before later model reviews; not a published revision or accepted fidelity score."
+        },
+        {
+          "status": "diagnostic-not-published",
+          "capturedAt": "2026-10-04T01:15:48.231Z",
+          "promptVersion": "studio-prompts@1.3.0",
+          "phase": "refining",
+          "approvedFileCount": 1,
+          "rendered": true,
+          "rawPixelAgreement": 0.9907578125,
+          "horizontalOverflow": true,
+          "buildFindings": 0,
+          "seriousOrCriticalAccessibility": 0,
+          "criticalVisual": 2,
+          "limitation": "Deterministic candidate diagnostic before later model reviews; not a published revision or accepted fidelity score."
+        },
+        {
+          "status": "diagnostic-not-published",
+          "capturedAt": "2026-10-04T01:14:20.029Z",
+          "promptVersion": "studio-prompts@1.3.0",
+          "phase": "refining",
+          "approvedFileCount": 1,
+          "rendered": true,
+          "rawPixelAgreement": 0.990578125,
+          "horizontalOverflow": false,
+          "buildFindings": 0,
+          "seriousOrCriticalAccessibility": 0,
+          "criticalVisual": 2,
+          "limitation": "Deterministic candidate diagnostic before later model reviews; not a published revision or accepted fidelity score."
+        }
+      ]
+    },
+    {
+      "runId": "88106d4a-8ea8-43b3-a618-866cb7a56575",
+      "startedAt": "2026-10-04T01:39:27.898Z",
+      "promptVersion": "studio-prompts@1.4.0",
+      "datasetHash": "d3b6d382405286977fa364a1a714b4a9cfc5af058e60743857d9677fa2db1979",
+      "sourceHashes": {
+        "scripts/live-smoke.ts": "c6cfa1dc2f5812a2344c5010c376bc167dad7f07a72d1e2903d5d4890dd3098b",
+        "src/server/orchestration.ts": "687331e2d785b79781630ca7db8b55ac801fdefaf157eb81fcc1598a43a882d3",
+        "src/server/openrouter.ts": "94572fa9c0589b40579b99649eb53f93ce3af880c9680103da6b49b0d17d8fd8",
+        "src/lib/prompts.ts": "308dd341741a6999726f2d4b5aae08c04e30125695dd221da04fc7f077495780",
+        "src/lib/schemas.ts": "5e51231fce4673480c2f7f1359113325f8d17f5372124e7d4dd4df9e1fcb6e5d",
+        "src/lib/domain.ts": "cf830446e2abe37e16ca49a8e89dcff92aa4a6799c2d7a68fe15d06ae2218129",
+        "src/server/quality-gates.ts": "5de0687ff05bef1a7de581d0bfbf23178828fbd25f04218b3f137a78db5c674a",
+        "src/server/render-project.ts": "1363f3741611fbbdee1da23b62494fe4e67c2b03ef17d9a9d97e1164c5d4e8c2",
+        "src/server/scaffold.ts": "83d46033353ee9bb0114af61ba39cba0c3044503f79c3998b015a54171cbab5c",
+        "src/server/validation.ts": "8a151a09abbfbf280112e15c8dfa2de347da782ac2c7ad1d5da1de9484ec9348",
+        "src/server/sandbox.ts": "1412422ea0ec47b268cffc80f03ad615221af76310b363e4673bb1d02ecc03b0",
+        "src/server/visual-comparison.ts": "bce7e0162678625d38819f6f6873191fbfebdaf05c4a751b4cc22568c72dfcf9",
+        "src/server/repository.ts": "dcf73536fef4100509118a58ba5a7c90b71362c95f3f1434388b1109be3ed6fd",
+        "src/server/http.ts": "3f5810c98aeb451059ccede7f4230370fadc3bca980200cecfc8c983365c6f86",
+        "src/workers/jobs.ts": "33ae9776963ba4b9b41b2afeb8dbc6e12139cf5da85bbc8884973b0d94e04120",
+        "src/workers/render.ts": "3e1ecb0bdc777538b09548f5ad1b41a991f44fb975a90fb5b59a9768d51c87d1",
+        "src/app/api/v1/uploads/initiate/route.ts": "00b8a8db68ad8306f1a4d4920abc6f2f8302fe268c1f90269d4599dfbfa0d697",
+        "src/app/api/v1/projects/[projectId]/spec/route.ts": "6903e2712138b9506f3f1b3a29d26819997a225bb6f62fba4e2118c68fd68e0f",
+        "src/app/api/v1/projects/[projectId]/generations/route.ts": "5100f951e53ff94e3c692f4493cb5a259f1c46d82b99ea9e168021f9f10ded19",
+        "src/app/api/v1/revisions/[revisionId]/export/route.ts": "74419b4939671a11ed88246b0d4f56d75243b7c2803b89176398b6721b20ddd4",
+        "resources/export/react-tailwind.lock.json": "2057ee21e7b98b8bd114c2f313cb796c98663bf81e8e6dd103fa852655d4ad3b",
+        "resources/export/nextjs-tailwind.lock.json": "1de22c85db1c925d6c7e5146e64b93f4e8b16082f3d5170525a77b6d17bbc426",
+        ".npmrc": "0ed44e7d606cd7a9eba915a10f13a13a09ea85e4b2bb4415bb0c481dbdcded51",
+        "package.json": "762b26450da35c42aa21bc54b6d333bbf0c241c83ec9152554cfefe94b960780",
+        "package-lock.json": "08fdb2725c586609d8fe90040605462d70fb3e892384b58b910f0b1a8071a196",
+        "Dockerfile.render": "5de97c1d81b19ec6e4c96a0e07cd6a425e8799f0be82261854b185427dd32a23",
+        "vendor/braces/package.json": "6dd0fd81b0289b65c6acc3988439b32bdd451c1d9dc899e7cedf116bbbe41731",
+        "vendor/braces/index.js": "332ea07c7b006361aad12aa994ca75dc1db8e8382b884909e2f38f10b85c88a4",
+        "vendor/braces/LICENSE": "35bdd8a44339719441900fb50fbefc5e2dca1ca662cbaed7a687de842c8b70f2",
+        "vendor/braces/README.md": "b4563a211ccf1928bb9ea1831a8145681c31f4442482f9811b74ff4bf8b41b7b",
+        "vendor/braces/lib/bounds.js": "b6652b3b8dc21cc5cc9c703bbee2d8f6a7e8729f09205ad565111b75ada2f7bb",
+        "vendor/braces/lib/compile.js": "462771e28ad4b7c34fc7c9e71f1ffb2d2c2b97b176b825c7eab4a524db0673c6",
+        "vendor/braces/lib/constants.js": "c18ac5adb57308f1ce42a28552da3a31f5d83709743ebd9a636336813a744d4b",
+        "vendor/braces/lib/expand.js": "e853a43dfc4c01241123a3d1bb2354c5e176b5cf947f0d0a86b7d051e55ef34b",
+        "vendor/braces/lib/parse.js": "6dd705abd9163dc74250f25d18bc164f1196b3281e4b7e288dc0e650899881d6",
+        "vendor/braces/lib/stringify.js": "8bf9cf5c9a025e04b9afa01a944a4ffa105368e7a8bb0def85a02f547113ef58",
+        "vendor/braces/lib/utils.js": "b5a7596aa67730412b3c029ef09e84e6b67b8e445cffd35d1d295549c89066c7",
+        "src/components/project-tree.tsx": "38f27c9f0699021784332e301321d82b1e7a2658b350ce2b3db5b8725e7a23a5",
+        "src/components/studio.tsx": "d8b614303c6b1f7cdd8f12f15d537c06133d27774e48b76ef492696aa0a571c6",
+        "src/components/preview-workspace.tsx": "951db48abc9c6710262f737cecf2fd3a81e041fb65aabc06b5f841825889b548",
+        "src/server/output-contract.ts": "2a281fb8d1b0516a7065e388fd07e01f31577bf1a301e1ca8985bfe924dc1b4f",
+        "src/server/reference-classification.ts": "05358f8e49d4b11136328f30f4ecbe1491528dd0cbf6f63592d6d6270d6eac24"
+      },
+      "cases": [
+        "dashboard-desktop"
+      ],
+      "sandbox": "docker",
+      "environment": {
+        "node": "v25.2.0",
+        "platform": "win32",
+        "rendererImageId": "sha256:96faeea7824a75a48ed49baae36e949f1e9ed62297ad5e6d07b4ba724737955d"
+      },
+      "routing": {
+        "preferredFamilies": "nemotron,gemma",
+        "retries": "3",
+        "timeoutMs": "90000",
+        "maxRefinementIterations": "0",
+        "pricePolicy": "zero-only"
+      },
+      "limitations": [
+        "Authored development references; not real-user, holdout, or generalization evidence.",
+        "Uses the actual upload/analysis/queue/generation/review/export APIs; no oracle source or truth is sent to inference.",
+        "The model-produced specification is submitted automatically in this test, without human confirmation.",
+        "A ready revision is studio-gate acceptance, not independent visual accuracy; inspect the retained captures and findings."
+      ],
+      "results": [
+        {
+          "caseId": "dashboard-desktop",
+          "group": "dashboard",
+          "completed": false,
+          "analysisModel": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "models": [
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+          ],
+          "failurePhase": "generation",
+          "failureCategory": "provider_rate_limit",
+          "durationMs": 200526,
+          "acceptedQuality": null
+        }
+      ],
+      "attempted": 1,
+      "readyAndExported": 0,
+      "telemetry": [
+        {
+          "stage": "COMPONENT_HIERARCHY",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 1,
+          "observedTotalTokens": 3592,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "DESIGN_TOKEN_NORMALIZER",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 1,
+          "observedTotalTokens": 3199,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "FILE_PLAN",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 1,
+          "observedTotalTokens": 4308,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "GENERATE",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-26b-a4b-it:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "GENERATE",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-31b-it:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "GENERATE",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 1,
+          "observedTotalTokens": 6807,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "REFERENCE_CLASSIFIER",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": null,
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "STATIC_REVIEW",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-26b-a4b-it:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "STATIC_REVIEW",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-31b-it:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "STATIC_REVIEW",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "STATIC_REVIEW",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "nvidia/nemotron-3.5-lightning:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "VISUAL_SPEC",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-26b-a4b-it:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "VISUAL_SPEC",
+          "outcome": "error",
+          "errorCode": "HTTP_429",
+          "model": "google/gemma-4-31b-it:free",
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "VISUAL_SPEC",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "attempts": 1,
+          "observedTotalTokens": 5868,
+          "observedCostCredits": 0,
+          "accountedAttempts": 1
+        },
+        {
+          "stage": "analysis",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": null,
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        },
+        {
+          "stage": "build_render_evaluate",
+          "outcome": "ok",
+          "errorCode": null,
+          "model": null,
+          "attempts": 1,
+          "observedTotalTokens": null,
+          "observedCostCredits": null,
+          "accountedAttempts": 0
+        }
+      ],
+      "privateCandidateDiagnostics": [
+        {
+          "status": "diagnostic-not-published",
+          "capturedAt": "2026-10-04T01:42:45.395Z",
+          "promptVersion": "studio-prompts@1.4.0",
+          "phase": "validating",
+          "approvedFileCount": 1,
+          "rendered": true,
+          "rawPixelAgreement": 0.9894427083333334,
+          "horizontalOverflow": false,
+          "buildFindings": 0,
+          "seriousOrCriticalAccessibility": 0,
+          "criticalVisual": 3,
+          "limitation": "Deterministic candidate diagnostic before later model reviews; not a published revision or accepted fidelity score."
+        }
+      ]
+    }
+  ],
+  "oracleInstrumentRuns": [
+    {
+      "runId": "fba84fb9-13f9-482b-91a0-276111dc5af4",
+      "startedAt": "2026-10-04T01:35:54.065Z",
+      "lane": "self-test",
+      "datasetHash": "db77c64a6696892ddc2529ff92ae477668cf7e62e188102435e38899a43a711f",
+      "promptVersion": "studio-prompts@1.4.0",
+      "summary": {
+        "attempts": 2,
+        "independentGroups": 2,
+        "completionRate": 0.5,
+        "firstBuildRate": 1,
+        "completion95Interval": [
+          0,
+          1
+        ],
+        "pixelAgreement": {
+          "value": 0.9956536458333334,
+          "measured": 1,
+          "total": 2
+        },
+        "geometry": {
+          "value": 1,
+          "measured": 1,
+          "total": 2
+        },
+        "textCoverage": {
+          "value": 1,
+          "measured": 1,
+          "total": 2
+        },
+        "p95DurationMs": 7637.371300000001,
+        "failures": {
+          "validation": 1
+        }
+      },
+      "results": [
+        {
+          "caseId": "dashboard-desktop",
+          "group": "dashboard",
+          "completed": true,
+          "firstBuildPassed": true,
+          "failureCategory": null,
+          "pixelAgreement": 0.9956536458333334
+        },
+        {
+          "caseId": "table-desktop",
+          "group": "table",
+          "completed": false,
+          "firstBuildPassed": true,
+          "failureCategory": "validation",
+          "pixelAgreement": null
+        }
+      ],
+      "limitation": "Authored oracle source: infrastructure validation, NOT AI quality or an independent human study."
+    },
+    {
+      "runId": "f6613fe2-d9ad-402b-9825-353b6092f13a",
+      "startedAt": "2026-10-04T01:38:29.929Z",
+      "lane": "self-test",
+      "datasetHash": "d3b6d382405286977fa364a1a714b4a9cfc5af058e60743857d9677fa2db1979",
+      "promptVersion": "studio-prompts@1.4.0",
+      "summary": {
+        "attempts": 4,
+        "independentGroups": 4,
+        "completionRate": 1,
+        "firstBuildRate": 1,
+        "completion95Interval": [
+          1,
+          1
+        ],
+        "pixelAgreement": {
+          "value": 0.9966994357638889,
+          "measured": 4,
+          "total": 4
+        },
+        "geometry": {
+          "value": 1,
+          "measured": 4,
+          "total": 4
+        },
+        "textCoverage": {
+          "value": 1,
+          "measured": 4,
+          "total": 4
+        },
+        "p95DurationMs": 7474.8648,
+        "failures": {}
+      },
+      "results": [
+        {
+          "caseId": "dashboard-desktop",
+          "group": "dashboard",
+          "completed": true,
+          "firstBuildPassed": true,
+          "failureCategory": null,
+          "pixelAgreement": 0.9956536458333334
+        },
+        {
+          "caseId": "table-desktop",
+          "group": "table",
+          "completed": true,
+          "firstBuildPassed": true,
+          "failureCategory": null,
+          "pixelAgreement": 0.9971796875
+        },
+        {
+          "caseId": "settings-desktop",
+          "group": "settings",
+          "completed": true,
+          "firstBuildPassed": true,
+          "failureCategory": null,
+          "pixelAgreement": 0.9961302083333333
+        },
+        {
+          "caseId": "login-desktop",
+          "group": "login",
+          "completed": true,
+          "firstBuildPassed": true,
+          "failureCategory": null,
+          "pixelAgreement": 0.9978342013888889
+        }
+      ],
+      "limitation": "Authored oracle source: infrastructure validation, NOT AI quality or an independent human study."
+    }
+  ]
+}

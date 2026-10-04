@@ -9,7 +9,12 @@ await mkdir("resources/export", { recursive: true });
 for (const framework of ["react-tailwind", "nextjs-tailwind"] as const) {
   const dir = await mkdtemp(path.join(tmpdir(), "ss2-lock-"));
   try {
-    const manifest = scaffoldProject([entry], plan, framework, false).find(file => file.path === "package.json")!;
+    const scaffold = scaffoldProject([entry], plan, framework, false);
+    for (const file of scaffold.filter(file => file.path.startsWith("vendor/") || file.path === ".npmrc")) {
+      await mkdir(path.dirname(path.join(dir, file.path)), { recursive: true });
+      await writeFile(path.join(dir, file.path), file.content);
+    }
+    const manifest = scaffold.find(file => file.path === "package.json")!;
     await writeFile(path.join(dir, "package.json"), manifest.content);
     await new Promise<void>((resolve, reject) => {
       const executable = process.platform === "win32" ? "npm.cmd" : "npm";

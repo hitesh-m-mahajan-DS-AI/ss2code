@@ -14,7 +14,7 @@ export function FileTree({ files, active, onSelect }: { files: ManifestFile[]; a
     node.file = file;
   }
   const render = (node: Node): React.ReactNode => node.file
-    ? <li key={node.path}><button type="button" aria-current={node.path === active ? "true" : undefined} className={node.path === active ? "active" : ""} title={node.path} onClick={() => onSelect(node.path)}>{node.name}</button></li>
+    ? <li key={node.path}><button type="button" aria-label={node.path} aria-current={node.path === active ? "true" : undefined} className={node.path === active ? "active" : ""} title={node.path} onClick={() => onSelect(node.path)}>{node.name}</button></li>
     : <li key={node.path}><details open><summary>{node.name}</summary><ul>{[...node.children.values()].sort((a, b) => Number(Boolean(a.file)) - Number(Boolean(b.file)) || a.name.localeCompare(b.name)).map(render)}</ul></details></li>;
   return <nav aria-label="Project files" className="file-tree"><ul>{[...root.children.values()].map(render)}</ul></nav>;
 }

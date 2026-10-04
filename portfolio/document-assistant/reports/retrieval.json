@@ -1,7 +1,7 @@
 {
-  "createdAt": "2026-10-02T00:19:31.218Z",
+  "createdAt": "2026-10-04T00:25:01.569Z",
   "mode": "lexical retrieval-only; no LLM answers evaluated",
-  "corpusVersion": "2026-10-02T00:00:46.665Z",
+  "corpusVersion": "2026-10-04T00:25:00.923Z",
   "documents": [
     {
       "file": "operations.md",
@@ -31,7 +31,7 @@
       ],
       "abstained": false,
       "reciprocalRank": 1,
-      "latencyMs": 0.2733000000000061
+      "latencyMs": 0.5010000000000048
     },
     {
       "id": "q02",
@@ -42,7 +42,7 @@
       ],
       "abstained": false,
       "reciprocalRank": 1,
-      "latencyMs": 0.05679999999998131
+      "latencyMs": 0.06229999999999336
     },
     {
       "id": "q03",
@@ -53,7 +53,7 @@
       ],
       "abstained": false,
       "reciprocalRank": 1,
-      "latencyMs": 0.0508999999999844
+      "latencyMs": 0.05359999999998877
     },
     {
       "id": "q04",
@@ -64,7 +64,7 @@
       ],
       "abstained": false,
       "reciprocalRank": 1,
-      "latencyMs": 0.0403999999999769
+      "latencyMs": 0.039400000000000546
     },
     {
       "id": "q05",
@@ -75,7 +75,7 @@
       ],
       "abstained": false,
       "reciprocalRank": 1,
-      "latencyMs": 0.041299999999978354
+      "latencyMs": 0.03190000000000737
     },
     {
       "id": "q06",
@@ -86,7 +86,7 @@
       ],
       "abstained": false,
       "reciprocalRank": 1,
-      "latencyMs": 0.039299999999997226
+      "latencyMs": 0.03360000000000696
     },
     {
       "id": "q07",
@@ -97,7 +97,7 @@
       ],
       "abstained": false,
       "reciprocalRank": 1,
-      "latencyMs": 0.02780000000001337
+      "latencyMs": 0.024499999999989086
     },
     {
       "id": "q08",
@@ -108,7 +108,7 @@
       ],
       "abstained": false,
       "reciprocalRank": 1,
-      "latencyMs": 0.02209999999999468
+      "latencyMs": 0.021299999999996544
     },
     {
       "id": "q09",
@@ -120,7 +120,7 @@
       ],
       "abstained": false,
       "reciprocalRank": 0.5,
-      "latencyMs": 0.044900000000012597
+      "latencyMs": 0.04399999999998272
     },
     {
       "id": "q10",
@@ -131,7 +131,7 @@
       ],
       "abstained": false,
       "reciprocalRank": 1,
-      "latencyMs": 0.0368999999999744
+      "latencyMs": 0.03479999999998995
     },
     {
       "id": "q11",
@@ -142,7 +142,7 @@
       ],
       "abstained": false,
       "reciprocalRank": 1,
-      "latencyMs": 0.030699999999995953
+      "latencyMs": 0.03299999999998704
     },
     {
       "id": "q12",
@@ -153,7 +153,7 @@
       ],
       "abstained": false,
       "reciprocalRank": 1,
-      "latencyMs": 0.0262000000000171
+      "latencyMs": 0.028499999999979764
     },
     {
       "id": "q13",
@@ -162,7 +162,7 @@
       "retrieved": [],
       "abstained": true,
       "reciprocalRank": 0,
-      "latencyMs": 0.01979999999997517
+      "latencyMs": 0.018699999999995498
     },
     {
       "id": "q14",
@@ -180,7 +180,7 @@
       "retrieved": [],
       "abstained": true,
       "reciprocalRank": 0,
-      "latencyMs": 0.022199999999998
+      "latencyMs": 0.02189999999998804
     },
     {
       "id": "q16",
@@ -189,7 +189,7 @@
       "retrieved": [],
       "abstained": true,
       "reciprocalRank": 0,
-      "latencyMs": 0.021399999999999864
+      "latencyMs": 0.021099999999989905
     }
   ]
 }

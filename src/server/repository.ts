@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { mkdirSync, existsSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
-import type { GenerationJob, JobEvent, Revision, StoredAsset, VisualSpec } from "@/lib/domain";
+import type { Evaluation, FilePlan, GeneratedProject, GenerationJob, JobEvent, Revision, StoredAsset, VisualSpec } from "@/lib/domain";
 import { jobContext } from "./job-context";
 import sharp from "sharp";
 
@@ -183,6 +183,22 @@ export class LocalProjectStore {
     const job = database.jobs.find((item) => item.id === jobId);
     if (!job || database.projectOwners[job.projectId] !== ownerId) throw new Error("Generation job not found or access is denied.");
     return job;
+  }
+
+  /** Private diagnostic evidence only. A capture is never a published revision. */
+  async saveCandidateEvidence(jobId: string, ownerId: string, input: { project: GeneratedProject; plan: FilePlan; visualSpec: VisualSpec; evaluation: Evaluation; promptVersion: string; error?: string }, render?: { screenshot: Buffer; diff: Buffer }) {
+    const job = await this.getJob(jobId, ownerId);
+    if (!/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(jobId)) throw new Error("Invalid candidate evidence job identifier.");
+    jobContext.getStore()?.signal.throwIfAborted();
+    const storageKey = `candidates/${jobId}/${randomUUID()}`;
+    const target = path.join(this.root, storageKey);
+    await mkdir(target, { recursive: true, mode: 0o700 });
+    await writeFile(path.join(target, "metadata.json"), JSON.stringify({ ...input, capturedAt: new Date().toISOString(), phase: job.phase, status: "diagnostic-not-published" }, null, 2), { mode: 0o600 });
+    if (render) {
+      await writeFile(path.join(target, "capture.png"), render.screenshot, { mode: 0o600 });
+      await writeFile(path.join(target, "diff.png"), render.diff, { mode: 0o600 });
+    }
+    return storageKey;
   }
 
   async createRevision(revision: Omit<Revision, "id" | "createdAt">) {

@@ -4,7 +4,7 @@ This guide runs the existing studio, including its persistent generation worker.
 
 ## 1. Prerequisites
 
-Install Git, VS Code, and **Node.js 24** with npm (the version used by this repository's CI). Open a fresh VS Code terminal after installation so PATH updates take effect. Node.js 22.13 is the minimum; using Node 24 keeps your environment aligned with CI.
+Install Git, VS Code, and **Node.js 24** with npm (the version used by this repository's CI). Open a fresh VS Code terminal after installation so PATH updates take effect. The environment doctor requires Node 24 or newer; older versions are not part of this verification recipe.
 
 Use a local, writable folder, not a network share or cloud-synced folder: the application uses SQLite WAL plus private files on the same machine. No separate PostgreSQL, Redis, or FFmpeg installation is needed for this implementation.
 
@@ -54,6 +54,7 @@ PRIVATE_STORAGE_ROOT=.data/private
 SANDBOX_MODE=process
 SANDBOX_IMAGE=ss2code-render:local
 SESSION_SECRET=YOUR_RANDOM_SECRET
+STUDIO_HOST=127.0.0.1
 ```
 
 Replace both placeholder values. Obtain your inference key from your [OpenRouter account](https://openrouter.ai/settings/keys). Generate a session secret locally, then paste the result into SESSION_SECRET:
@@ -85,6 +86,8 @@ npm.cmd run dev
 Wait for both the Next.js ready message and **Persistent generation worker ready.** Open [http://localhost:3000](http://localhost:3000).
 
 This command starts the web app and worker together. Starting only `next dev` leaves queued generation jobs without a worker. Keep the terminal open; use Ctrl+C to stop. Restart after editing .env.local. Web source updates refresh automatically; restart after changing worker/server orchestration code to reload the separate worker.
+
+The launcher loads .env.local before starting both children and binds to loopback by default. Keep using the same browser origin, such as `http://localhost:3000`, to retain workspace ownership; switching to `127.0.0.1`, another port or another browser profile uses different cookies. Do not set STUDIO_HOST to a public interface for a local demo. Non-loopback hosting needs separately configured access controls, HTTPS and network protection.
 
 ### F5 in VS Code
 
@@ -143,6 +146,8 @@ SANDBOX_IMAGE=ss2code-render:local
 
 Restart the studio. The web app and queue still run locally; only build/render jobs use disposable, network-disabled containers. Rebuild this image after changes to dependencies, lock templates, or renderer source.
 
+Run `npm.cmd run doctor` before your first generation. It checks Node, Chromium, the permitted endpoint, credential presence, the session secret, Docker and the renderer image without displaying credentials. It does not verify authentication, free quotas, image freshness or reconstruction accuracy. `npm.cmd run doctor -- --production` additionally requires container rendering.
+
 For a local production-mode check, stop development, keep Docker configured, and run:
 
 ```powershell
@@ -162,6 +167,7 @@ npm.cmd run lint
 npm.cmd test
 npm.cmd run build
 npm.cmd run test:e2e
+npm.cmd audit --audit-level=high
 ```
 
 No real inference key is needed by these tests. Browser tests use explicit fixtures and isolated temporary storage, exercise the actual app, then download, install, and build an exported ZIP. They need network access for dependency installation and reserve port 3100. Captures are written to .data/test-reports.
@@ -175,7 +181,20 @@ npm.cmd run test:e2e
 Remove-Item Env:SANDBOX_MODE
 ```
 
-Setting SANDBOX_MODE=docker also enables the Next.js container-build assertion. The previous implementation commit passed these checks in [GitHub Actions](https://github.com/hitesh-m-mahajan-DS-AI/ss2code/actions/runs/36343779198). Live AI output quality still needs a real OpenRouter run.
+Setting SANDBOX_MODE=docker also enables the Next.js container-build assertion. The dated [evidence report](portfolio/EVIDENCE.md) records which local and remote checks actually passed; configuration alone does not prove a CI result.
+
+For a bounded **real inference** check, stop the studio, configure Docker and a valid OpenRouter key, and run:
+
+```powershell
+npm.cmd run benchmark:fixtures
+npm.cmd run test:live -- --limit 2
+```
+
+This uses two authored development references and the actual upload, analysis, queued generation, review and export APIs. It reserves port 3200, writes private run fingerprints/results under `.data/live-smoke`, and exits nonzero if any workflow fails. It consumes free-model quotas and can take several minutes per case. It does not mock inference, use oracle source, test arbitrary websites or certify visual accuracy. Do not run it concurrently with another Next.js development session, browser integration tests or a production build. Keep failures in the report instead of retrying until only successful results remain.
+
+If .env.local still selects process rendering, set `$env:SANDBOX_MODE = "docker"` in this terminal before the live check, then remove that override when finished. Unlike the deterministic suite, the live command loads .env.local for credentials; its Docker requirement remains explicit.
+
+The repository and exported ZIPs include the documented [bounded braces fork](vendor/braces/README.md) and `.npmrc`; preserve both when installing. It replaces an upstream implementation with an unpatched nesting advisory, rather than suppressing that advisory. A clean npm audit does not assess this local fork; its regression tests and isolation remain necessary. Run `npm ci` again after changes to the vendored implementation.
 
 ## 9. Troubleshooting
 
@@ -208,6 +227,9 @@ src/server/              OpenRouter, storage, orchestration and validation
 src/workers/             Persistent job worker and isolated renderer
 scripts/studio.mjs       Starts the web app and worker together
 resources/export/        Reproducible generated-project lock templates
+vendor/braces/           Documented bounded dependency fork included in exports
+scripts/doctor.ts        Secret-safe local environment readiness check
+scripts/live-smoke.ts    Bounded real OpenRouter workflow check and private evidence
 tests/                   Unit, integration and browser/export tests
 .env.local               Your private configuration (not committed)
 .data/private/           Local persistent data (not committed)

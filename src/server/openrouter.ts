@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { ZodTypeAny } from "zod";
@@ -9,6 +8,8 @@ import { jobContext } from "./job-context";
 import { store } from "./repository";
 import { recordSpan, type Usage } from "./telemetry";
 import { documentEvidenceSchema } from "../lib/document-schema";
+import { scopedOutputContract, formatDiagnostics, contractFingerprint } from "./output-contract";
+import { PROMPT_VERSION } from "@/lib/prompts";
 
 export type CatalogModel = { id: string; context_length?: number; architecture?: { input_modalities?: string[]; output_modalities?: string[] }; supported_parameters?: string[]; pricing?: Record<string, string | undefined>; reasoning?: { supported_efforts?: string[] | null; supports_max_tokens?: boolean; mandatory?: boolean } };
 let catalogCache: { fetchedAt: number; models: ModelCandidate[] } | undefined;
@@ -102,19 +103,22 @@ export async function readCompletion(response: Response, streaming: boolean) {
   return { text, modelId, ...(usage ? { usage } : {}) };
 }
 
-export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prompt: string; imageDataUrl?: string; imageDataUrls?: string[]; requestedModelId?: string; stream?: boolean; systemPrompt?: string }) {
+export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prompt: string; imageDataUrl?: string; imageDataUrls?: string[]; requestedModelId?: string; stream?: boolean; systemPrompt?: string; allowedFilePaths?: string[] }) {
   const sharedSystemPrompt = input.systemPrompt ?? screenshotSystemPrompt;
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured. Add it to the server environment.");
-  const schema = roleSchemas[input.prompt.match(/^ROLE: (\w+)/)?.[1] ?? ""];
-  if (!schema) throw new Error("Unknown prompt contract.");
-  const cacheKey = createHash("sha256").update(JSON.stringify(input)).digest("hex");
+  const contractRole = input.prompt.match(/^ROLE: (\w+)/)?.[1] ?? "";
+  const baseSchema = roleSchemas[contractRole];
+  if (!baseSchema) throw new Error("Unknown prompt contract.");
+  const schema = scopedOutputContract(contractRole, baseSchema, input.allowedFilePaths);
+  const schemaText = JSON.stringify(zodToJsonSchema(schema, { $refStrategy: "root" }));
+  const cacheKey = contractFingerprint(input, schemaText, sharedSystemPrompt, PROMPT_VERSION);
   const cached = await store.checkpoint(cacheKey) as { value: T; modelId: string } | undefined;
   if (cached) return cached;
-  const schemaText = JSON.stringify(zodToJsonSchema(schema, { $refStrategy: "root" }));
   const images = input.imageDataUrls ?? (input.imageDataUrl ? [input.imageDataUrl] : []);
   const role = images.length ? "vision" : input.role;
-  const outputTokens = input.role === "code" ? 16_000 : 6000;
+  const codeOutput = input.role === "code" || input.role === "repair";
+  const outputTokens = codeOutput ? 16_000 : 6000;
   const contextTokens = Math.ceil((input.prompt.length + schemaText.length) / 3) + outputTokens + images.length * 2000;
   const candidates = eligibleModels(await getLiveModelCatalog(), role, contextTokens, input.requestedModelId);
   if (!candidates.length) throw new Error("NO_ELIGIBLE_FREE_MODEL: no current free model has the required modality and context capacity.");
@@ -122,6 +126,7 @@ export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prom
   const retries = Math.min(4, Math.max(0, Number(process.env.MAX_MODEL_RETRIES ?? 3)));
   const started = Date.now();
   let formatRetry = false;
+  let formatIssues = "";
   let formatCandidate: ModelCandidate | undefined;
   let transportRetries = 0;
   const attempted = new Set<string>();
@@ -141,10 +146,10 @@ export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prom
     // Zod remains strict locally. API strict=false preserves optional/recursive contracts.
     const reasoning = parameters.has("reasoning") ? {
       exclude: true,
-      ...(candidate.reasoning?.supportsMaxTokens ? { max_tokens: input.role === "code" ? 2048 : 1024 }
+      ...(candidate.reasoning?.supportsMaxTokens ? { max_tokens: codeOutput ? 2048 : 1024 }
         : candidate.reasoning?.supportedEfforts === null || candidate.reasoning?.supportedEfforts?.includes("low") ? { effort: "low" } : {}),
     } : undefined;
-    const prompt = input.prompt + "\n\nExact JSON schema:\n" + schemaText + (formatRetry ? "\nReturn only schema-valid JSON. Correct the response format; do not add prose or fields." : "");
+    const prompt = input.prompt + "\n\nExact JSON schema:\n" + schemaText + (formatRetry ? "\nReturn only schema-valid JSON. Correct the response format; do not add prose or fields. Contract failures: " + formatIssues : "");
     const attemptStart = performance.now();
     let attemptDuration: number | undefined;
     let attemptUsage: Usage | undefined;
@@ -162,9 +167,10 @@ export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prom
       attemptUsage = completion.usage; attemptModel = completion.modelId;
       let value: T;
       try { value = schema.parse(JSON.parse(completion.text)) as T; }
-      catch {
+      catch (error) {
         outcome = "schema_error"; errorCode = "SCHEMA_INVALID";
         if (formatRetry) throw new Error("Model response failed its schema after one format retry.");
+        formatIssues = formatDiagnostics(error);
         formatRetry = true; formatCandidate = candidate; continue;
       }
       const result = { value, modelId: completion.modelId };

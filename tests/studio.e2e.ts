@@ -51,7 +51,7 @@ try {
     await db.savePreview(revision.id, render.screenshot); await db.saveArtifact(revision.id, "bundle", render.html); await db.saveArtifact(revision.id, "diff", render.diff);
     await db.updateJob(job.id, { phase: "ready", revisionId: revision.id }); ids.push(revision.id);
   }
-  launch(["node_modules/next/dist/bin/next", "dev", "-p", "3100"]);
+  launch(["node_modules/next/dist/bin/next", "dev", "-p", "3100", "--hostname", "127.0.0.1"]);
   launch(["--import", "tsx", "src/workers/jobs.ts"]);
   let ready = false;
   for (let attempt = 0; attempt < 60; attempt++) {
@@ -76,6 +76,9 @@ try {
   await page.getByRole("button", { name: "Lock region", exact: true }).click();
   assert.equal(await page.getByRole("button", { name: "Unlock region", exact: true }).getAttribute("aria-pressed"), "true");
   await page.getByRole("button", { name: "Files", exact: true }).click();
+  await page.getByRole("navigation", { name: "Project files" }).getByRole("button", { name: "vendor/braces/package.json", exact: true }).click();
+  await page.getByRole("button", { name: "Copy file", exact: true }).click();
+  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /@ss2code\/braces-bounded/);
   await page.getByRole("navigation", { name: "Project files" }).getByRole("button", { name: "package.json", exact: true }).click();
   await page.getByRole("button", { name: "Copy file", exact: true }).click();
   assert.match(await page.evaluate(() => navigator.clipboard.readText()), /reconstructed-interface/);
@@ -125,7 +128,11 @@ try {
   const stream = await context.request.get(origin + "/api/v1/generations/" + initial.job.id + "/events");
   const events = await stream.text();
   assert.match(events, /event: complete/); assert.match(events, /OPENROUTER_API_KEY/);
+  const recovered = await (await context.request.get(origin + "/api/v1/projects?project=" + projectId)).json();
+  assert.equal(recovered.job?.id, initial.job.id);
+  assert.equal(recovered.job?.phase, "failed");
   await page.reload();
+  await page.getByText("Project restored.", { exact: false }).waitFor();
   await page.getByRole("button", { name: "Build", exact: true }).click();
   await page.getByRole("button", { name: "Retry safely", exact: true }).waitFor();
   await page.getByRole("button", { name: "Reference", exact: true }).click();
@@ -156,6 +163,10 @@ try {
   assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
   console.log("Independent export install/build, ownership, CSRF, idempotent replay, failure recovery, upload persistence and video frame selection passed.");
 } catch (error) {
+  for (const context of browser.contexts()) {
+    const failurePage = context.pages()[0];
+    if (failurePage) await failurePage.screenshot({ path: ".data/test-reports/failure.png", fullPage: true }).catch(() => undefined);
+  }
   console.error(logs); throw error;
 } finally {
   await browser.close();

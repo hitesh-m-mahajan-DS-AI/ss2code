@@ -1,6 +1,6 @@
 # Operations, security and release runbook
 
-Updated 2026-10-02. See [DEPLOYMENT.md](../DEPLOYMENT.md) for the single-host production recipe and [LOCAL_SETUP.md](../LOCAL_SETUP.md) for VS Code.
+Updated 2026-10-04. See [DEPLOYMENT.md](../DEPLOYMENT.md) for the single-host production recipe and [LOCAL_SETUP.md](../LOCAL_SETUP.md) for VS Code. The current verification scope is local; no infrastructure purchase or public deployment is authorized.
 
 ## Local startup and verification
 
@@ -12,11 +12,12 @@ npm run dev
 
 Configure `.env.local` from `.env.example`; never commit it. Only `OPENROUTER_API_KEY` is an inference credential. Open the studio at `http://localhost:3000`. `npm run dev` starts both web and durable worker processes. Stop both before replacing dependencies or moving the private volume.
 
-Release checks: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `npm run test:e2e`, the benchmark self-test, document evaluation and Python unit tests. CI includes a separate Python job and Docker-backed Node verification. A configured workflow is not evidence that its remote run passed; inspect the actual GitHub run after pushing.
+Release checks: `npm run doctor`, `npm audit --audit-level=high`, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `npm run test:e2e`, the benchmark self-test, document evaluation and Python unit tests. CI includes a separate Python job, vulnerability scan and Docker-backed Node verification. A configured workflow is not evidence that its remote run passed; inspect the actual GitHub run after pushing. Real inference is a separately bounded `npm run test:live` check, not a secret-bearing public CI job.
 
 ## Threat boundaries
 
 - Treat generated source and uploaded references as untrusted. Process rendering is for private local development; public/untrusted production rendering requires the no-network Docker sandbox. Never expose a Docker control socket to generated code.
+- The [bounded local braces fork](../vendor/braces/README.md) mitigates an upstream nesting/recursion advisory through fixed parser/AST limits and installed-path regression tests. Preserve `.npmrc`, the fork and matching lockfiles in studio and exports. npm audit does not evaluate a local fork; zero findings do not constitute a security certification. Expansion attacks outside this mitigation remain constrained by renderer isolation/resource caps, not a universal dependency guarantee.
 - Free pricing is checked against current catalog metadata and constrained to zero prompt/completion price. Never fix a quota failure by silently buying a paid route or adding a direct provider key.
 - Keep the session secret stable and outside backups intended for sharing. The signed ownership cookie is not account recovery. Losing it can lose workspace access.
 - `.data`, `.env.local`, raw corpora, model binaries, run candidates and telemetry must not enter public Git history. Public evidence is limited to authored examples and reviewed aggregate results.

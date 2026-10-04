@@ -27,5 +27,8 @@ test("real worker builds CSS/TS, measures fidelity, detects type errors and prod
     }
     const bad = fixtureFiles.map(f => f.path === "src/App.tsx" ? { ...f, content: "const value: number = 'wrong'; export default function App(){return <main>{value}</main>}" } : f);
     await assert.rejects(renderAndCompare({ ...input, files: bad }), /not assignable/);
+    const mobileBad = fixtureFiles.map(file => file.path.endsWith(".css") ? { ...file, content: file.content + "\n@media(max-width:400px){body main h1{color:#cccccc;background:#ffffff}}" } : file);
+    const mobileResult = await renderAndCompare({ ...input, files: mobileBad });
+    assert.ok(mobileResult.a11yFindings.some(f => f.id === "color-contrast-360" && ["critical", "serious"].includes(f.severity)), "Mobile-only contrast must be checked, not just the reference viewport");
   } finally { await browser.close(); }
 });

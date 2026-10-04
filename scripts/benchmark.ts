@@ -12,6 +12,7 @@ import { validateGeneratedProject } from "../src/server/validation";
 import { componentTreePrompt, filePlanPrompt, generationPrompt, repairPrompt, tokenPrompt, visualSpecPrompt, PROMPT_VERSION } from "../src/lib/prompts";
 import { generatedProjectSchema, filePlanSchema, visualSpecSchema, patchSetSchema } from "../src/lib/schemas";
 import type { FilePlan, GeneratedProject } from "../src/lib/domain";
+import { boundedBraceFiles } from "../src/server/scaffold";
 
 const args = process.argv.slice(2);
 const option = (name: string, fallback: string) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
@@ -37,6 +38,8 @@ let commit = "unavailable";
 try { commit = execFileSync("git", ["-c", `safe.directory=${process.cwd().replaceAll("\\", "/")}`, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(); } catch {}
 const results: BenchmarkResult[] = [];
 const sourceFiles = ["scripts/benchmark.ts", "scripts/benchmark-fixtures.ts", "src/lib/prompts.ts", "src/lib/schemas.ts", "src/lib/domain.ts", "src/server/openrouter.ts", "src/server/validation.ts", "src/server/sandbox.ts", "src/server/render-project.ts", "src/server/scaffold.ts", "src/server/visual-comparison.ts", "src/workers/render.ts", "src/evaluation/contracts.ts", "resources/export/react-tailwind.lock.json", "resources/export/nextjs-tailwind.lock.json", "Dockerfile.render", "tsconfig.json", "package.json", "package-lock.json"];
+sourceFiles.push(...boundedBraceFiles.map(file => "vendor/braces/" + file));
+sourceFiles.push("src/server/output-contract.ts");
 const sourceHashes = Object.fromEntries(await Promise.all(sourceFiles.map(async file => [file, createHash("sha256").update(await readFile(file)).digest("hex")])));
 await writeFile(path.join(out, "run.json"), JSON.stringify({ runId, startedAt: new Date().toISOString(), lane, split, limit, repeats, selectedCases: selected.map(item => item.id), commit, sourceHashes, routing: { preferredFamilies: process.env.MODEL_PREFERRED_FAMILIES ?? "nemotron,gemma", retries: process.env.MAX_MODEL_RETRIES ?? "3", timeoutMs: process.env.REQUEST_TIMEOUT_MS ?? "90000" }, promptVersion: PROMPT_VERSION, datasetHash: createHash("sha256").update(manifestBytes).digest("hex"), environment: { node: process.version, platform: process.platform, sandbox: process.env.SANDBOX_MODE ?? "process" }, disclaimer: "Synthetic pilot, not real-user evidence. Self-test uses oracle code; live lanes use only OpenRouter." }, null, 2));
 const safeError = (error: unknown) => String(error).replace(/sk-or-v1-[\w-]+/g, "[redacted]").slice(0, 5000);
@@ -47,7 +50,12 @@ for (const item of selected) for (let repeat = 0; repeat < repeats; repeat++) {
     const started = performance.now();
     const row: BenchmarkResult = { id: item.id, group: item.group, category: item.category, lane, repeat, traceId, completed: false, firstBuildPassed: false, durationMs: 0, modelIds: [], repairPasses: 0 };
     let phase = "input";
-    const call = async (input: Parameters<typeof structuredOpenRouterCall>[0]) => { phase = input.prompt.match(/^ROLE: (\w+)/)?.[1] ?? "generation"; const response = await structuredOpenRouterCall(input); row.modelIds.push(response.modelId); return response.value; };
+    const call = async (input: Parameters<typeof structuredOpenRouterCall>[0]) => {
+      phase = input.prompt.match(/^ROLE: (\w+)/)?.[1] ?? "generation";
+      const response = await structuredOpenRouterCall(input); row.modelIds.push(response.modelId);
+      await writeFile(path.join(out, `${item.id}-${repeat}-stage-${row.modelIds.length}-${phase}.json`), JSON.stringify(response, null, 2));
+      return response.value;
+    };
     try {
       const imagePath = path.resolve(path.dirname(manifestPath), item.reference);
       if (!imagePath.startsWith(path.dirname(manifestPath) + path.sep)) throw new Error("Reference escaped dataset directory");
@@ -67,7 +75,7 @@ for (const item of selected) for (let repeat = 0; repeat < repeats; repeat++) {
         const tokens = await call({ role: "blueprint", prompt: tokenPrompt(spec) });
         const tree = await call({ role: "blueprint", prompt: componentTreePrompt(spec, tokens) });
         plan = filePlanSchema.parse(await call({ role: "blueprint", prompt: filePlanPrompt(spec, tokens, tree, "react-tailwind") }));
-        project = generatedProjectSchema.parse(await call({ role: "code", stream: true, prompt: generationPrompt(spec, plan, "react-tailwind", item.viewport) }));
+        project = generatedProjectSchema.parse(await call({ role: "code", allowedFilePaths: plan.files.map(f => f.path), imageDataUrl: referenceDataUrl, stream: true, prompt: generationPrompt(spec, plan, "react-tailwind", item.viewport) }));
       }
       let best: Awaited<ReturnType<typeof renderAndCompare>> | undefined;
       let selectedPass: number | undefined;
@@ -80,6 +88,8 @@ for (const item of selected) for (let repeat = 0; repeat < repeats; repeat++) {
           const validation = validateGeneratedProject(project, plan);
           if (validation.buildFindings.length) throw new Error(JSON.stringify(validation.buildFindings));
           const rendered = await renderAndCompare({ files: project.files, plan, referenceDataUrl, viewport: item.viewport, visualSpec: item.truth });
+          await writeFile(path.join(out, `${item.id}-${repeat}-capture-${pass}.png`), rendered.screenshot);
+          await writeFile(path.join(out, `${item.id}-${repeat}-diff-${pass}.png`), rendered.diff);
           await writeFile(path.join(out, `${item.id}-${repeat}-evaluation-${pass}.json`), JSON.stringify({ metrics: rendered.metrics, visual: rendered.visualFindings, accessibility: rendered.a11yFindings }, null, 2));
           if (pass === 0) row.firstBuildPassed = true;
           const passed = !rendered.metrics.horizontalOverflow && !rendered.a11yFindings.some(f => ["critical", "serious"].includes(f.severity)) && !rendered.visualFindings.some(f => f.severity === "critical");
@@ -90,7 +100,8 @@ for (const item of selected) for (let repeat = 0; repeat < repeats; repeat++) {
         await writeFile(path.join(out, `${item.id}-${repeat}-findings-${pass}.json`), JSON.stringify(findings, null, 2));
         if (pass < (lane === "repair" ? 2 : 0)) {
           try {
-            const patch = patchSetSchema.parse(await call({ role: "repair", imageDataUrl: referenceDataUrl, prompt: repairPrompt({ mode: best ? "visual" : "build", filePlan: plan, files: project.files, findings, viewport: item.viewport, refinementPass: pass + 1 }) }));
+            const mode = findings && typeof findings === "object" && "build" in findings ? "build" : "visual";
+            const patch = patchSetSchema.parse(await call({ role: "repair", allowedFilePaths: project.files.map(f => f.path), imageDataUrl: mode === "visual" ? referenceDataUrl : undefined, prompt: repairPrompt({ mode, filePlan: plan, files: project.files, findings, viewport: item.viewport, refinementPass: pass + 1 }) }));
             const replacements = new Map(patch.files.map(f => [f.path, f]));
             if (replacements.size !== patch.files.length || [...replacements.keys()].some(p => !project.files.some(f => f.path === p))) throw new Error("Invalid repair scope");
             project = { ...project, files: project.files.map(f => replacements.get(f.path) ?? f) }; row.repairPasses++;

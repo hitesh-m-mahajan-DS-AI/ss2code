@@ -4,7 +4,8 @@ import type { FilePlan, ManifestFile } from "@/lib/domain";
 import { assertSafeProjectPath, sourcePolicyFindings } from "@/lib/security";
 
 export const dependencies = ["react", "react-dom", "lucide-react"];
-const toolchain = ["typescript", "esbuild", "postcss", "tailwindcss", "autoprefixer", "eslint", "typescript-eslint", "eslint-plugin-jsx-a11y", "@types/react", "@types/react-dom"];
+const toolchain = ["typescript", "esbuild", "postcss", "tailwindcss", "autoprefixer", "eslint", "typescript-eslint", "eslint-plugin-jsx-a11y", "@types/react", "@types/react-dom", "fill-range"];
+export const boundedBraceFiles = ["package.json", "index.js", "LICENSE", "README.md", "lib/bounds.js", "lib/compile.js", "lib/constants.js", "lib/expand.js", "lib/parse.js", "lib/stringify.js", "lib/utils.js"];
 const reserved = /^(?:package(?:-lock)?\.json|tsconfig\.json|eslint\.config\.mjs|next\.config\.mjs|postcss\.config\.mjs|tailwind\.config\.mjs|README\.md|__studio\/|scripts\/)/;
 
 export function assertSourceManifest(files: ManifestFile[]) {
@@ -41,7 +42,8 @@ export function scaffoldProject(files: ManifestFile[], plan: FilePlan, framework
   const manifest = {
     name: "reconstructed-interface", version: "1.0.0", private: true, type: "module",
     scripts: { typecheck: "tsc --noEmit", lint: "eslint . --max-warnings 0", build: "npm run typecheck && npm run lint && node scripts/build.mjs", dev: "npm run build && node scripts/serve.mjs", start: "node scripts/serve.mjs" },
-    dependencies: versions(dependencies), devDependencies: versions(toolchain),
+    dependencies: versions(dependencies), devDependencies: { ...versions(toolchain), braces: "file:vendor/braces" },
+    overrides: { braces: "$braces" },
   };
   const trusted: ManifestFile[] = [
     { path: "package.json", content: JSON.stringify(manifest, null, 2) },
@@ -53,6 +55,9 @@ export function scaffoldProject(files: ManifestFile[], plan: FilePlan, framework
     { path: "scripts/serve.mjs", content: 'import { createServer } from "node:http";\nimport { readFile } from "node:fs/promises";\nconst types = { "/": "text/html", "/index.html": "text/html", "/app.js": "text/javascript", "/app.css": "text/css" };\ncreateServer(async (req, res) => { const key = new URL(req.url, "http://localhost").pathname; if (!types[key]) { res.writeHead(404).end(); return; } try { res.setHeader("Content-Type", types[key]); res.end(await readFile(new URL("../dist/" + (key === "/" ? "index.html" : key.slice(1)), import.meta.url))); } catch { res.writeHead(500).end("Run npm run build first."); } }).listen(4173, "127.0.0.1", () => console.log("Open http://localhost:4173"));\n' },
     { path: "README.md", content: "# Reconstructed interface\n\nRequires Node.js 22.13 or newer.\n\n1. Run npm ci --ignore-scripts.\n2. Run npm run dev and open http://localhost:4173.\n3. Run npm run build for type checking, linting, and the production build.\n\nSource references and API keys are never included. Source fidelity and inferred responsive behavior should be reviewed before publishing. The included lockfile pins the complete dependency graph. The development command serves the built files; rebuild after editing source.\n" },
   ];
+  trusted.push(...boundedBraceFiles.map(file => ({ path: "vendor/braces/" + file, content: readFileSync(path.join(process.cwd(), "vendor", "braces", file), "utf8") })));
+  trusted.push({ path: ".npmrc", content: "install-links=true\n" });
+  trusted.find(file => file.path === "eslint.config.mjs")!.content = trusted.find(file => file.path === "eslint.config.mjs")!.content.replace('"scripts/**"', '"vendor/**", "scripts/**"');
   if (framework === "nextjs-tailwind") {
     const nextManifest = { ...manifest, dependencies: { ...manifest.dependencies, ...versions(["next"]) }, scripts: { ...manifest.scripts, dev: "next dev", build: "npm run typecheck && npm run lint && next build", start: "next start" } };
     trusted[0].content = JSON.stringify(nextManifest, null, 2);
