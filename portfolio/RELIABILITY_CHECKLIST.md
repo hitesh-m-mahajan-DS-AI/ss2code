@@ -25,6 +25,10 @@ Updated 14 October 2026. README.md and prompts.md remain the authoritative targe
 - [x] Synchronize browser failure-recovery checks with completed project restoration and assert the actual restored failed job, while retaining a capture on future test failures.
 - [x] Load environment configuration before spawning the web/worker launcher; bind local launcher and test servers to loopback by default.
 - [x] Add signed per-region CSS-pixel edge deltas and material adjacent-region spacing diagnostics without lowering existing geometry/pixel/text thresholds.
+- [x] Add a separate per-region visible-foreground overlap signal so whitespace cannot mask missing content behind a high pixel score; critical regions below the overlap threshold fail closed.
+- [x] Tighten VisualSpec/generation prompts to use close visible-object bounds and place region markers on the matching rendered element; version the changed prompts.
+- [x] Treat equivalent system-ui computed fallback stacks as typography matches instead of emitting noisy false repair findings.
+- [x] After one bounded format retry, fail over from a schema-invalid route to another currently verified-free route; keep transport retries and the dynamic free router bounded.
 - [x] Measure browser-computed typography only through exact region IDs and explicit element markers; treat missing/ambiguous legacy mappings as unverified, and fail closed on high-confidence mapped title mismatches in critical regions.
 - [x] Add a real-browser regression proving that a high global pixel score can coexist with a blocking mapped typography mismatch.
 - [x] Persist each live provider attempt (route, duration, success/schema/provider outcome, bounded error code) on the active job and expose it in the studio activity panel; raw provider errors and prompt/image data remain excluded.
@@ -52,7 +56,7 @@ npm run build
 ## Not certified or silently marked complete
 
 - Arbitrary-website pixel-perfect reconstruction, dependable free-provider availability or production accuracy. The earlier six-attempt benchmark pilot was 0/6; retain that denominator. Small authored samples and studio acceptance are not independent visual proof.
-- The latest studio diagnostic ledger is 0/7 ready/exported across configurations. The newest isolated one-case run, after routing/audit changes, succeeded through analysis and three blueprint calls but failed in code generation (two 90-second timeouts and two HTTP 429 responses); better audit visibility and routing cooldowns are not a reconstruction fix. The prior run's HTTP 502 is retained in its own record.
+- The latest studio diagnostic ledger is 0/11 ready/exported across configurations. The newest one-case run, after schema-route failover was implemented, still failed during visual analysis: two malformed Nemotron outputs, two Gemma 429s, one route-capability 400 and a free-router 404. No live reconstruction was published. The saved candidate from an earlier run scored 94.7–98.9% on raw regions but only 0–9.6% visible-foreground overlap; the new gate correctly treats that whitespace-driven agreement as insufficient. These results are development diagnostics, not an accuracy estimate.
 - Region-level AI accuracy or component-level generalization. The original benchmark truth remains page-level and live VisualSpecs are model-produced. The separate 12-case region oracle uses the same authored DOM/source that generated its screenshots, so it validates the instrument rather than independent AI accuracy.
 - Nominal 90% forecast coverage. The measured historical run remains 72.6% and blocked; fixing promotion safety does not change its statistics. A new untouched labelled period is needed for a defensible model-improvement claim.
 - Broad document reasoning/retrieval quality. Sixteen authored lexical questions are a smoke test, not a representative semantic/LLM evaluation or proof against all prompt injection.

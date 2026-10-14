@@ -1,0 +1,55 @@
+{
+  "recordedDate": "2026-10-14",
+  "scope": "one-case live OpenRouter development diagnostics",
+  "runsAdded": [
+    {
+      "runId": "e91d6879-1224-4c91-841b-e2680ab7f7df",
+      "promptVersion": "studio-prompts@1.6.0",
+      "caseId": "dashboard-desktop",
+      "completed": false,
+      "failurePhase": "analysis",
+      "durationMs": 99875,
+      "outcome": "Reference classification passed. The selected Nemotron route returned schema-invalid visual specifications twice, including one bounded format retry; no valid VisualSpec was produced.",
+      "publishedRevision": false,
+      "exported": false
+    },
+    {
+      "runId": "e12027d4-c0bd-4c84-8802-423b5bc9d7d3",
+      "promptVersion": "studio-prompts@1.6.0",
+      "caseId": "dashboard-desktop",
+      "completed": false,
+      "failurePhase": "analysis",
+      "durationMs": 107357,
+      "outcome": "After two schema-invalid Nemotron responses, the new bounded failover reached two Gemma HTTP 429s, a Dots HTTP 400, and an OpenRouter free-router HTTP 404. No valid VisualSpec was produced.",
+      "publishedRevision": false,
+      "exported": false
+    }
+  ],
+  "cumulativeStudioDiagnosticLedger": {
+    "readyAndExported": 0,
+    "attempts": 11,
+    "interpretation": "Heterogeneous diagnostics across changing source/configuration; not a calibrated accuracy estimate or a pooled success rate."
+  },
+  "offlineReevaluationOfRetainedCandidate": {
+    "sourceRunId": "2ed50258-8a81-4060-a851-385981a7bbf2",
+    "candidateCount": 2,
+    "rawRegionPixelAgreementRange": [0.9473, 0.9893],
+    "visibleForegroundIoURange": [0, 0.0956],
+    "interpretation": "Recomputed locally from the frozen reference and private retained captures with the new foreground-overlap metric. This is diagnostic evidence, not a new model run. The apparent high pixel agreement was dominated by whitespace and would now trigger blockers in key regions."
+  },
+  "localVerification": {
+    "preflight": "passed",
+    "providerUnitTests": "10 passed",
+    "realBrowserMissing-contentRegression": "passed",
+    "fullSuite": "47 passed, 1 skipped",
+    "focusedRealBrowserRender": "passed",
+    "previousBrowserE2E": "passed",
+    "previousProductionBuild": "passed"
+  },
+  "limitations": [
+    "The live model-produced specification is not independently human-scored.",
+    "No holdout benchmark case was opened.",
+    "No successful live screenshot-to-export run has been demonstrated.",
+    "Free-route availability and output quality remain unproven despite improved bounded fallback."
+  ]
+}

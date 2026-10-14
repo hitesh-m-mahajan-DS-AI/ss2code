@@ -42,3 +42,12 @@ test("typography measurements honor role mapping, confidence and explicit region
   assert.equal(checks[1].status, "ambiguous");
   assert.deepEqual(checks[1].mismatches, []);
 });
+
+test("system font aliases in a computed fallback stack are not reported as a typography mismatch", () => {
+  const checks = compareTypography([
+    { role: "heading", sizePxApprox: 32, weight: "bold", notes: "system UI heading", regionId: "title", confidence: "high", family: "system-ui, -apple-system, sans-serif" },
+  ], [
+    { status: "measured", regionId: "title", fontSizePx: 32, weight: "700", family: 'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji"', lineHeightPx: 40 },
+  ]);
+  assert.deepEqual(checks[0].mismatches, []);
+});

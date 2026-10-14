@@ -126,8 +126,12 @@ function numericWeight(value: string | undefined) {
 
 function familyMatches(expected: string, actual: string) {
   const normalize = (family: string) => family.trim().replace(/^['"]|['"]$/g, "").toLowerCase();
-  const expectedFamily = normalize(expected);
-  return actual.split(",").some(family => normalize(family) === expectedFamily);
+  const expectedFamilies = expected.split(",").map(normalize);
+  const actualFamilies = actual.split(",").map(normalize);
+  // Computed CSS expands platform aliases (for example, a system-ui stack may
+  // report "ui-sans-serif, system-ui, ..."). Any exact family in the approved
+  // fallback stack is sufficient; comparing the whole stack yields false alarms.
+  return expectedFamilies.some(family => actualFamilies.includes(family));
 }
 
 export function compareTypography(expectations: TypographyExpectation[], observations: TypographyObservation[]): TypographyCheck[] {

@@ -90,7 +90,7 @@ export type Evaluation = {
     visualScore?: number;
     previousVisualScore?: number;
     horizontalOverflow: boolean;
-    regions?: Array<{ region: string; pixelScore: number; geometryScore?: number; textCoverage?: number; edgeDeltasPx?: { left: number; top: number; right: number; bottom: number } }>;
+    regions?: Array<{ region: string; pixelScore: number; foregroundScore?: number; geometryScore?: number; textCoverage?: number; edgeDeltasPx?: { left: number; top: number; right: number; bottom: number } }>;
     layoutRelationships?: Array<{ firstRegion: string; secondRegion: string; axis: "horizontal" | "vertical"; expectedGapPx: number; actualGapPx: number; deltaPx: number }>;
     layoutRelationshipsChecked?: number;
     typographyChecks?: Array<{ role: string; regionId?: string; confidence?: "high" | "medium" | "low"; status: "measured" | "missing" | "ambiguous"; verified: boolean; expected: { fontSizePx: number; weight: string; family?: string; lineHeightPx?: number; letterSpacingPx?: number }; actual?: { fontSizePx?: number; weight?: string; family?: string; lineHeightPx?: number; letterSpacingPx?: number }; mismatches: string[] }>;

@@ -16,6 +16,18 @@ test("real worker builds CSS/TS, measures fidelity, detects type errors and prod
     assert.equal(result.metrics.horizontalOverflow, false);
     assert.equal(result.metrics.regions?.[0].textCoverage, 1);
     assert.ok(!result.a11yFindings.some(f => ["critical", "serious"].includes(f.severity)));
+    const headingBounds = await page.locator("h1").evaluate(node => {
+      const rect = node.getBoundingClientRect();
+      return [rect.x / innerWidth * 100, rect.y / innerHeight * 100, rect.width / innerWidth * 100, rect.height / innerHeight * 100] as [number, number, number, number];
+    });
+    const headingSpec = { ...fixtureSpec, observations: { ...fixtureSpec.observations, layout: [{ id: "headline", region: "Headline", boundsPct: headingBounds, description: "Visible page heading", importance: "critical" as const }], visibleText: [] } };
+    const invisibleHeading = fixtureFiles.map(file => file.path === "src/Header.tsx" ? { ...file, content: file.content.replace("<h1>", '<h1 data-ss2-region="headline">') } : file.path.endsWith(".css") ? { ...file, content: file.content + "\nh1{color:#101828!important}" } : file);
+    const invisibleResult = await renderAndCompare({ ...input, files: invisibleHeading, visualSpec: headingSpec });
+    const headlineMetric = invisibleResult.metrics.regions?.[0];
+    assert.ok(headlineMetric);
+    assert.ok(headlineMetric.pixelScore > 0.9, "a tiny text region can retain a misleadingly high area-normalized pixel score");
+    assert.equal(headlineMetric.foregroundScore, 0);
+    assert.ok(invisibleResult.visualFindings.some(f => f.id === "region-headline" && f.severity === "critical" && f.observed.includes("visible-content overlap 0%")));
     await page.setContent('<iframe sandbox="allow-scripts" title="Test preview"></iframe>');
     await page.locator("iframe").evaluate((node, html) => { (node as HTMLIFrameElement).srcdoc = html; }, result.html);
     const frame = page.frameLocator("iframe");

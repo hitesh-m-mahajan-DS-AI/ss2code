@@ -155,20 +155,29 @@ export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prom
   const codeOutput = input.role === "code" || input.role === "repair";
   const outputTokens = codeOutput ? 16_000 : 6000;
   const contextTokens = Math.ceil((input.prompt.length + schemaText.length) / 3) + outputTokens + images.length * 2000;
-  const candidates = eligibleModels(await getLiveModelCatalog(), role, contextTokens, input.requestedModelId);
-  if (!candidates.length) throw new Error("NO_ELIGIBLE_FREE_MODEL: no current free model has the required modality and context capacity.");
+  const eligible = eligibleModels(await getLiveModelCatalog(), role, contextTokens, input.requestedModelId);
+  if (!eligible.length) throw new Error("NO_ELIGIBLE_FREE_MODEL: no current free model has the required modality and context capacity.");
+  // Keep the dynamic router as a reserved last route. It can choose from currently
+  // available zero-price providers when the individually named free routes are busy.
+  const freeRouterFallback = input.requestedModelId === "openrouter/free" ? undefined : eligible.find(model => model.id === "openrouter/free");
+  const candidates = freeRouterFallback ? eligible.filter(model => model.id !== freeRouterFallback.id) : eligible;
   const signal = jobContext.getStore()?.signal;
   const retries = Math.min(4, Math.max(0, Number(process.env.MAX_MODEL_RETRIES ?? 3)));
+  const maxAttempts = retries + 2 + (freeRouterFallback ? 1 : 0); // initial + transport retries + format retry + reserved free-router fallback
   let formatRetry = false;
   let formatIssues = "";
   let formatCandidate: ModelCandidate | undefined;
   let transportRetries = 0;
   const attempted = new Set<string>();
   let lastError: unknown;
-  for (let attempt = 0; attempt <= retries + 1; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     signal?.throwIfAborted();
     const available = candidates.filter(candidate => (health.get(candidate.id)?.until ?? 0) <= Date.now());
-    const candidate = formatCandidate ?? available.find(model => !attempted.has(model.id)) ?? available[0];
+    const shouldUseFreeRouter = !!freeRouterFallback && !attempted.has(freeRouterFallback.id)
+      && (transportRetries >= retries || available.length === 0 || attempt === maxAttempts - 1);
+    const candidate = formatCandidate ?? (shouldUseFreeRouter
+      ? freeRouterFallback
+      : available.find(model => !attempted.has(model.id)) ?? available[0] ?? (freeRouterFallback && !attempted.has(freeRouterFallback.id) ? freeRouterFallback : undefined));
     formatCandidate = undefined;
     if (!candidate) throw new Error("Free routes are temporarily unhealthy. Retry after their cooldown.");
     attempted.add(candidate.id);
@@ -189,6 +198,7 @@ export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prom
     let attemptUsage: Usage | undefined;
     let attemptModel = candidate.id;
     let outcome: "ok" | "error" | "schema_error" = "error";
+    let schemaRejected = false;
     let errorCode = "PROVIDER_FAILED";
     try {
       const response = await fetch(baseUrl() + "/chat/completions", {
@@ -203,6 +213,7 @@ export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prom
       try { value = schema.parse(JSON.parse(completion.text)) as T; }
       catch (error) {
         outcome = "schema_error"; errorCode = "SCHEMA_INVALID";
+        schemaRejected = true;
         if (formatRetry) throw new Error("Model response failed its schema after one format retry.");
         formatIssues = formatDiagnostics(error);
         formatRetry = true; formatCandidate = candidate; continue;
@@ -222,15 +233,33 @@ export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prom
       else if (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name)) errorCode = error.name === "TimeoutError" ? "TIMEOUT" : "ABORTED";
       if (signal?.aborted) throw new Error("JOB_CANCELLED");
       lastError = error;
-      const transient = error instanceof ProviderError ? [408, 429, 500, 502, 503, 504].includes(error.status) : error instanceof TypeError || (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name));
-      if (!transient || transportRetries >= retries) throw error;
-      transportRetries++;
+      // A route can advertise JSON mode yet repeatedly violate the local Zod
+      // contract. Keep the single same-route format retry, then fail over rather
+      // than letting one model's malformed output terminate the whole workflow.
+      if (schemaRejected) {
+        const hasNextNamedRoute = candidates.some(model => !attempted.has(model.id));
+        const hasFreeRouterRoute = !!freeRouterFallback && !attempted.has(freeRouterFallback.id);
+        if (!hasNextNamedRoute && !hasFreeRouterRoute) throw error;
+        const failures = (health.get(candidate.id)?.failures ?? 0) + 1;
+        health.set(candidate.id, { failures, until: Date.now() + 60_000 });
+        const context = jobContext.getStore();
+        if (context) await store.appendEvent(context.jobId, { type: "model.retry", level: "warning", safeMessage: "Model response did not satisfy the output contract. Trying another eligible free route." });
+        continue;
+      }
+      // A 400 can mean that one provider route rejects a capability the live catalog
+      // advertised (for example, image + structured output). Try another free route,
+      // but cool the rejecting route and do not retry it with the same payload.
+      const routeRejected = error instanceof ProviderError && error.status === 400;
+      const transient = routeRejected || (error instanceof ProviderError ? [408, 429, 500, 502, 503, 504].includes(error.status) : error instanceof TypeError || (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name)));
+      const canUseFreeRouter = !!freeRouterFallback && candidate.id !== freeRouterFallback.id && !attempted.has(freeRouterFallback.id);
+      if (!transient || (transportRetries >= retries && !canUseFreeRouter)) throw error;
+      if (!routeRejected) transportRetries++;
       const failures = (health.get(candidate.id)?.failures ?? 0) + 1;
       const rateLimited = error instanceof ProviderError && error.status === 429;
-      health.set(candidate.id, { failures, until: rateLimited || failures >= 2 ? Date.now() + 60_000 : 0 });
+      health.set(candidate.id, { failures, until: rateLimited || routeRejected || failures >= 2 ? Date.now() + 60_000 : 0 });
       const context = jobContext.getStore();
       if (context) await store.appendEvent(context.jobId, { type: "model.retry", level: "warning", safeMessage: "Free model temporarily unavailable. Retrying with an eligible free route." });
-      await delay(Math.max(error instanceof ProviderError ? error.retryAfter : 0, Math.min(8000, 500 * 2 ** attempt + Math.random() * 300)), undefined, { signal });
+      if (!routeRejected) await delay(Math.max(error instanceof ProviderError ? error.retryAfter : 0, Math.min(8000, 500 * 2 ** attempt + Math.random() * 300)), undefined, { signal });
     } finally {
       const durationMs = attemptDuration ?? performance.now() - attemptStart;
       recordSpan({ stage: input.prompt.match(/^ROLE: (\w+)/)?.[1] ?? input.role, outcome, durationMs, model: attemptModel, attempt: attempt + 1, usage: attemptUsage, errorCode: outcome === "ok" ? undefined : errorCode });

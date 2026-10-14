@@ -87,6 +87,72 @@ test("OpenRouter retries a transient failure via a free fallback and records the
   } finally { globalThis.fetch = original; if (key === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = key; }
 });
 
+test("generation reserves a final zero-price OpenRouter free-router attempt after named vision routes fail", async () => {
+  const original = globalThis.fetch, key = process.env.OPENROUTER_API_KEY, retries = process.env.MAX_MODEL_RETRIES, preferred = process.env.MODEL_PREFERRED_FAMILIES;
+  process.env.OPENROUTER_API_KEY = "test-only-not-a-real-key";
+  process.env.MAX_MODEL_RETRIES = "3";
+  process.env.MODEL_PREFERRED_FAMILIES = "nemotron,gemma";
+  const routes: string[] = [];
+  const files = [{ path: "src/App.tsx", content: "export default function App(){return <main/>}" }];
+  const project = { summary: "Test", files, interactionNotes: [], assumptionsApplied: [] };
+  const catalog = [
+    "nvidia/nemotron-vision-test:free",
+    "google/gemma-vision-test:free",
+    "dots-studio/dots-vision-test:free",
+    "thinkingmachines/inkling-small:free",
+    "openrouter/free",
+  ].map(id => ({ id, pricing: { prompt: "0", completion: "0" }, context_length: 128_000, supported_parameters: ["response_format"], architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } }));
+  globalThis.fetch = (async (url, options) => {
+    if (String(url).endsWith("/models")) return Response.json({ data: catalog });
+    const body = JSON.parse(String(options?.body)) as { model: string; provider: { max_price: unknown } };
+    assert.deepEqual(body.provider.max_price, { prompt: 0, completion: 0 });
+    routes.push(body.model);
+    if (body.model !== "openrouter/free") return new Response("", { status: 503 });
+    return Response.json({ model: "thinkingmachines/inkling-small:free", choices: [{ message: { content: JSON.stringify(project) } }] });
+  }) as typeof fetch;
+  try {
+    await getLiveModelCatalog(true);
+    const result = await structuredOpenRouterCall({ role: "code", imageDataUrl: "data:image/png;base64,aGVsbG8=", prompt: "ROLE: GENERATE\nCreate the approved page.", allowedFilePaths: ["src/App.tsx"] });
+    assert.deepEqual(result.value, project);
+    assert.equal(routes.length, 4);
+    assert.equal(routes.at(-1), "openrouter/free");
+    assert.ok(routes.slice(0, -1).every(model => model !== "openrouter/free"));
+    assert.equal(result.modelId, "thinkingmachines/inkling-small:free");
+  } finally {
+    globalThis.fetch = original;
+    if (key === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = key;
+    if (retries === undefined) delete process.env.MAX_MODEL_RETRIES; else process.env.MAX_MODEL_RETRIES = retries;
+    if (preferred === undefined) delete process.env.MODEL_PREFERRED_FAMILIES; else process.env.MODEL_PREFERRED_FAMILIES = preferred;
+  }
+});
+
+test("a provider route rejection falls through to another verified-free model without repeating the rejected route", async () => {
+  const original = globalThis.fetch, key = process.env.OPENROUTER_API_KEY, retries = process.env.MAX_MODEL_RETRIES, preferred = process.env.MODEL_PREFERRED_FAMILIES;
+  process.env.OPENROUTER_API_KEY = "test-only-not-a-real-key";
+  process.env.MAX_MODEL_RETRIES = "1";
+  process.env.MODEL_PREFERRED_FAMILIES = "gemma,nemotron";
+  const routes: string[] = [];
+  const value = { kind: "image", readiness: "ready", likelyRole: "primary", nextAction: "Inspect", safeNotes: [] };
+  globalThis.fetch = (async (url, options) => {
+    if (String(url).endsWith("/models")) return Response.json({ data: ["google/gemma-route-rejected:free", "nvidia/nemotron-route-fallback:free", "openrouter/free"].map(id => ({ id, pricing: { prompt: "0", completion: "0" }, context_length: 128_000, supported_parameters: ["response_format"], architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } })) });
+    const body = JSON.parse(String(options?.body)) as { model: string };
+    routes.push(body.model);
+    if (routes.length === 1) return new Response("", { status: 400 });
+    return Response.json({ model: body.model, choices: [{ message: { content: JSON.stringify(value) } }] });
+  }) as typeof fetch;
+  try {
+    await getLiveModelCatalog(true);
+    const result = await structuredOpenRouterCall({ role: "vision", prompt: "ROLE: REFERENCE_CLASSIFIER\nInspect the image." });
+    assert.deepEqual(result.value, value);
+    assert.deepEqual(routes, ["google/gemma-route-rejected:free", "nvidia/nemotron-route-fallback:free"]);
+  } finally {
+    globalThis.fetch = original;
+    if (key === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = key;
+    if (retries === undefined) delete process.env.MAX_MODEL_RETRIES; else process.env.MAX_MODEL_RETRIES = retries;
+    if (preferred === undefined) delete process.env.MODEL_PREFERRED_FAMILIES; else process.env.MODEL_PREFERRED_FAMILIES = preferred;
+  }
+});
+
 test("HTTP 429 immediately cools down that free route so later stages use a fallback", async () => {
   const original = globalThis.fetch, key = process.env.OPENROUTER_API_KEY, retries = process.env.MAX_MODEL_RETRIES, preferred = process.env.MODEL_PREFERRED_FAMILIES;
   process.env.OPENROUTER_API_KEY = "test-only-not-a-real-key"; process.env.MAX_MODEL_RETRIES = "1"; process.env.MODEL_PREFERRED_FAMILIES = "gemma,nemotron";
@@ -130,6 +196,33 @@ test("schema failure has one bounded format retry; authentication failure is not
     await assert.rejects(structuredOpenRouterCall({ role: "vision", prompt: "ROLE: REFERENCE_CLASSIFIER\nInspect." }), /401/);
     assert.equal(calls, 1);
   } finally { globalThis.fetch = original; if (key === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = key; }
+});
+
+test("a route that fails its one schema retry falls through to another verified-free model", async () => {
+  const original = globalThis.fetch, key = process.env.OPENROUTER_API_KEY, retries = process.env.MAX_MODEL_RETRIES, preferred = process.env.MODEL_PREFERRED_FAMILIES;
+  process.env.OPENROUTER_API_KEY = "test-only-not-a-real-key";
+  process.env.MAX_MODEL_RETRIES = "1";
+  process.env.MODEL_PREFERRED_FAMILIES = "gemma,nemotron";
+  const routes: string[] = [];
+  const value = { kind: "image", readiness: "ready", likelyRole: "primary", nextAction: "Inspect", safeNotes: [] };
+  globalThis.fetch = (async (url, options) => {
+    if (String(url).endsWith("/models")) return Response.json({ data: ["google/gemma-schema-test:free", "nvidia/nemotron-schema-fallback:free", "openrouter/free"].map(id => ({ id, pricing: { prompt: "0", completion: "0" }, context_length: 128_000, supported_parameters: ["response_format"], architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } })) });
+    const body = JSON.parse(String(options?.body)) as { model: string };
+    routes.push(body.model);
+    if (body.model === "google/gemma-schema-test:free") return Response.json({ model: body.model, choices: [{ message: { content: '{"unexpected":"field"}' } }] });
+    return Response.json({ model: body.model, choices: [{ message: { content: JSON.stringify(value) } }] });
+  }) as typeof fetch;
+  try {
+    await getLiveModelCatalog(true);
+    const result = await structuredOpenRouterCall({ role: "vision", prompt: "ROLE: REFERENCE_CLASSIFIER\nInspect." });
+    assert.deepEqual(result.value, value);
+    assert.deepEqual(routes, ["google/gemma-schema-test:free", "google/gemma-schema-test:free", "nvidia/nemotron-schema-fallback:free"]);
+  } finally {
+    globalThis.fetch = original;
+    if (key === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = key;
+    if (retries === undefined) delete process.env.MAX_MODEL_RETRIES; else process.env.MAX_MODEL_RETRIES = retries;
+    if (preferred === undefined) delete process.env.MODEL_PREFERRED_FAMILIES; else process.env.MODEL_PREFERRED_FAMILIES = preferred;
+  }
 });
 
 test("native schema and advertised reasoning controls survive a format retry followed by free fallback", async () => {

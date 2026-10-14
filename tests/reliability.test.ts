@@ -93,6 +93,23 @@ test("regional comparison detects localized differences and rejects stretched re
   assert.throws(() => compareImages(PNG.sync.write(a), PNG.sync.write(new PNG({ width: 10, height: 10 }))), /dimensions/);
 });
 
+test("foreground overlap catches missing content hidden by a misleadingly high regional pixel score", () => {
+  const reference = new PNG({ width: 320, height: 120 });
+  const blank = new PNG({ width: reference.width, height: reference.height });
+  for (const image of [reference, blank]) for (let y = 0; y < image.height; y++) for (let x = 0; x < image.width; x++) {
+    const offset = (y * image.width + x) * 4;
+    image.data[offset] = 245; image.data[offset + 1] = 247; image.data[offset + 2] = 250; image.data[offset + 3] = 255;
+  }
+  for (let y = 42; y < 58; y++) for (let x = 28; x < 128; x++) {
+    const offset = (y * reference.width + x) * 4;
+    reference.data[offset] = 26; reference.data[offset + 1] = 26; reference.data[offset + 2] = 26;
+  }
+  const result = compareImages(PNG.sync.write(reference), PNG.sync.write(blank), [{ id: "headline", region: "Headline", boundsPct: [0, 0, 100, 100], description: "Page title", importance: "critical" }]);
+  assert.ok(result.score > 0.9, "blank whitespace should demonstrate the weakness of whole-area pixel agreement");
+  assert.ok(result.regions[0].pixelScore > 0.9);
+  assert.equal(result.regions[0].foregroundScore, 0);
+});
+
 test("exports contain a complete pinned scaffold and reject configuration injection", () => {
   const files = scaffoldProject(fixtureFiles, fixturePlan);
   const manifest = JSON.parse(files.find(f => f.path === "package.json")!.content);
