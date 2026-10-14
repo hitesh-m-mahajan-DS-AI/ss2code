@@ -1,6 +1,6 @@
 # Screenshot-to-Code Studio
 
-> Implementation status (4 October 2026): locally tested engineering prototype, not a guaranteed pixel-perfect or fully implemented production product. This file and prompts.md define the target specification. See the [measured evidence](portfolio/EVIDENCE.md), [reliability checklist](portfolio/RELIABILITY_CHECKLIST.md) and [remaining boundaries](portfolio/ARCHITECTURE.md) before making portfolio claims.
+> Implementation status (14 October 2026): locally tested engineering prototype, not a proven reliable screenshot-to-code product. The recorded live reconstruction diagnostics remain 0/5 ready/exported; the latest green GitHub Actions run verifies engineering checks, not AI accuracy. This file and prompts.md define the target product specification. See the [measured evidence](portfolio/EVIDENCE.md), [reliability checklist](portfolio/RELIABILITY_CHECKLIST.md) and [remaining boundaries](portfolio/ARCHITECTURE.md) before making portfolio claims.
 
 > Also suitable for a product branded **PixelForge AI**: a reference-to-frontend studio that turns supplied UI evidence into an editable, validated frontend project.
 
@@ -10,7 +10,9 @@ The product uses **OpenRouter exclusively** for AI access. It is built to work o
 
 > A reference is the source of truth. Do not invent unrelated sections, branding, copy, or product features. When a detail cannot be seen, use a restrained, reusable default and record the assumption.
 
-## What the product delivers
+## Target product workflow
+
+The bullets below describe the intended product behavior; they are not a claim that every input path is fully implemented or that generated websites are reliably accurate. For current implementation boundaries, use [portfolio evidence](portfolio/EVIDENCE.md), [architecture notes](portfolio/ARCHITECTURE.md) and the [reliability checklist](portfolio/RELIABILITY_CHECKLIST.md).
 
 For the current implementation's setup, worker/storage deployment, validation commands and operational limits, see [DEPLOYMENT.md](./DEPLOYMENT.md). This README and prompts.md remain the product specifications.
 
