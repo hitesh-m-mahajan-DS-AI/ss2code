@@ -115,6 +115,10 @@ Local verification: 36 Node tests passed, including the worker renderer integrat
 
 A fresh one-case development **oracle infrastructure self-test** also completed 1/1. It reported 99.60% raw pixel agreement and zero page-region edge error; spacing pairs checked were 0 and typography checks were absent because this fixture's truth is only one page region. This validates metric plumbing, not AI reconstruction, component spacing, or model accuracy.
 
+### Dependency security follow-up
+
+GitHub Actions for the region-level fidelity commit exposed high-severity advisories in the then-locked Next.js, Sharp and source-map-js versions before CI reached its build or test steps. A non-breaking `npm audit fix` refreshed the lockfile to Next.js 16.4.0, Sharp 0.35.5 and source-map-js 1.2.2 (and refreshed compatible transitive packages). The high-severity gate `npm audit --audit-level=high` now passes. The full audit still reports three moderate advisories through Tailwind CSS 3's PostCSS selector parser; npm's proposed automatic remediation requires a Tailwind CSS 4 major migration, which was deliberately not applied without a separate compatibility pass. Updated local typecheck, lint, 35 runnable Node tests, the separate opt-in real-Chrome fidelity regression and the Webpack production build passed. This is a verified high-severity remediation, **not** a zero-vulnerability or security-certification claim; the updated commit still needs its GitHub Actions run.
+
 ## Defensible CV wording
 
 “Built a screenshot-to-code evaluation and observability system with capability-aware free-model routing, deterministic build/accessibility gates, private SQL analytics and failure-inclusive experiment reports.”
