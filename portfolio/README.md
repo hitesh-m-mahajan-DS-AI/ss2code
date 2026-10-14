@@ -4,11 +4,11 @@ Implemented 2 October 2026. This extends SS2Code; it does not replace the produc
 
 ## Current project status
 
-SS2Code is ready to showcase as an **engineering prototype**, not as a complete or proven screenshot-reconstruction product. The local workflow, validation gates and evaluation tooling are implemented, and the latest [GitHub Actions run](https://github.com/hitesh-m-mahajan-DS-AI/ss2code/actions/runs/38588711271) passed. That confirms software checks only: the recorded live screenshot-to-code diagnostics remain **0/5 ready/exported**, six holdout cases remain unopened, and no blinded human fidelity review has been conducted. The core AI accuracy claim is therefore unproven.
+SS2Code is ready to showcase as an **engineering prototype**, not as a complete or proven screenshot-reconstruction product. The local workflow, validation gates and evaluation tooling are implemented, and the latest recorded engineering checks passed. That confirms software behavior only: the studio-diagnostic ledger now records **0/6 ready/exported** across changing prompts/configurations (not a pooled accuracy estimate), six screenshot holdout cases remain unopened, and no blinded human fidelity review has been conducted. The core AI accuracy claim is therefore unproven.
 
 ### Copy-ready portfolio description
 
-> Built SS2Code, an OpenRouter-based screenshot-to-code engineering prototype with a local upload-to-preview workflow, isolated rendering, fail-closed validation, and region-level fidelity diagnostics. The system exposes its limitations rather than hiding them: recorded live diagnostics are 0/5 ready/exported, so reliable arbitrary-website reconstruction remains unproven. Current work focuses on provider resilience and a larger, independently reviewed visual evaluation.
+> Built SS2Code, an OpenRouter-based screenshot-to-code engineering prototype with a local upload-to-preview workflow, isolated rendering, fail-closed validation, and region-level fidelity diagnostics. The system exposes its limitations rather than hiding them: the latest studio diagnostic ledger records 0/6 ready/exported across changing configurations, so reliable arbitrary-website reconstruction remains unproven. Current work focuses on provider resilience and a larger, independently reviewed visual evaluation.
 
 This is a credible portfolio project when presented as an evaluation, reliability and applied-AI engineering effort. Do not describe it as production-ready, reliably accurate, or pixel-perfect.
 
@@ -52,6 +52,8 @@ npm run documents -- ask --question "Where do I configure OPENROUTER_API_KEY?"
 ```
 
 These commands require no inference key. Self-test deliberately uses authored reference code: it verifies the measuring instrument, not AI accuracy. Live screenshots and `documents -- ask --live` use the server-side OpenRouter key only. Run the Python project with the separate environment described in its README.
+
+The separate `npm run documents -- evaluate --suite challenge` command measures a frozen 20-question paraphrase/near-match/injection-probe retrieval set. It is descriptive retrieval-only evidence, not a live model answer, semantic-retrieval, groundedness, or prompt-injection score.
 
 ## Portfolio presentation
 

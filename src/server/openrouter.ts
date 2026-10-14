@@ -1,11 +1,11 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { ZodTypeAny } from "zod";
-import type { ModelCandidate, ModelRole } from "@/lib/domain";
+import type { ModelAudit, ModelCandidate, ModelRole } from "@/lib/domain";
 import { sharedSystemPrompt as screenshotSystemPrompt } from "@/lib/prompts";
 import * as schemas from "@/lib/schemas";
 import { jobContext } from "./job-context";
-import { store } from "./repository";
+import { store, type LocalProjectStore } from "./repository";
 import { recordSpan, type Usage } from "./telemetry";
 import { documentEvidenceSchema } from "../lib/document-schema";
 import { scopedOutputContract, formatDiagnostics, contractFingerprint } from "./output-contract";
@@ -42,8 +42,14 @@ export async function getLiveModelCatalog(force = false) {
 }
 
 export function eligibleModels(models: ModelCandidate[], role: ModelRole, context: number, requestedModelId?: string, excluded: string[] = []) {
-  const families = (process.env.MODEL_PREFERRED_FAMILIES ?? "nemotron,gemma").split(",").map(family => family.trim().toLowerCase()).filter(Boolean);
-  const score = (model: ModelCandidate) => model.id === requestedModelId ? 100 : model.id === "openrouter/free" ? 1 : (families.includes(model.family) ? 10 : 0) + (model.supportedParameters?.includes("structured_outputs") ? 6 : model.supportedParameters?.includes("response_format") ? 2 : 0);
+  const families = (role === "review" ? process.env.MODEL_REVIEW_PREFERRED_FAMILIES ?? "gemma,nemotron,qwen,llama,mistral,deepseek" : process.env.MODEL_PREFERRED_FAMILIES ?? "nemotron,gemma").split(",").map(family => family.trim().toLowerCase()).filter(Boolean);
+  const score = (model: ModelCandidate) => {
+    if (model.id === requestedModelId && role !== "review") return 100;
+    if (model.id === "openrouter/free") return 1;
+    const familyRank = families.indexOf(model.family);
+    const familyScore = familyRank < 0 ? 0 : (families.length - familyRank) * 10;
+    return familyScore + (model.supportedParameters?.includes("structured_outputs") ? 6 : model.supportedParameters?.includes("response_format") ? 2 : 0);
+  };
   // Modality alone does not make a specialist classifier suitable for generation.
   const specialist = /(?:^|[\/_-])(?:content-safety|moderation|guard|embeddings?|embed|rerank(?:er|ing)?)(?:[\/_:\d-]|$)/i;
   return models.filter(model => !specialist.test(model.id) && model.isFreeCandidate && model.outputModalities.includes("text") && model.inputModalities.includes(role === "vision" ? "image" : "text") && (model.contextLength ?? 0) >= context && !excluded.includes(model.id) && (health.get(model.id)?.until ?? 0) <= Date.now()).sort((a, b) => score(b) - score(a));
@@ -70,6 +76,35 @@ class ProviderError extends Error {
 }
 
 type Completion = { model?: string; usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number }; error?: { code?: number }; choices?: Array<{ delta?: { content?: string }; message?: { content?: string }; finish_reason?: string }> };
+
+export function modelAuditAttempt(input: { role: ModelRole; requestedModelId?: string }, candidate: ModelCandidate, details: { durationMs: number; attempt: number; outcome: "ok" | "error" | "schema_error"; errorCode?: string; resolvedModelId?: string }): ModelAudit {
+  return {
+    role: input.role,
+    requestedModelId: input.requestedModelId,
+    routedModelId: candidate.id,
+    resolvedModelId: details.resolvedModelId ?? candidate.id,
+    durationMs: details.durationMs,
+    attempts: 1,
+    attemptNumber: details.attempt,
+    outcome: details.outcome,
+    errorCode: details.outcome === "ok" ? undefined : details.errorCode,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export async function appendModelAttempt(input: { role: ModelRole; requestedModelId?: string }, candidate: ModelCandidate, details: { durationMs: number; attempt: number; outcome: "ok" | "error" | "schema_error"; errorCode?: string; resolvedModelId?: string }, attemptStore: LocalProjectStore = store) {
+  const context = jobContext.getStore();
+  if (!context) return;
+  try {
+    const ownerId = await attemptStore.checkpoint("ownerId") as string;
+    const job = await attemptStore.getJob(context.jobId, ownerId);
+    await attemptStore.updateJob(context.jobId, { modelAudit: [...job.modelAudit ?? [], modelAuditAttempt(input, candidate, details)] });
+  } catch {
+    // Audit persistence must never hide a provider result or its original failure.
+    console.warn("Model-attempt audit could not be persisted.");
+  }
+}
+
 export async function readCompletion(response: Response, streaming: boolean) {
   let text = "", modelId = "";
   let usage: Usage | undefined;
@@ -124,7 +159,6 @@ export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prom
   if (!candidates.length) throw new Error("NO_ELIGIBLE_FREE_MODEL: no current free model has the required modality and context capacity.");
   const signal = jobContext.getStore()?.signal;
   const retries = Math.min(4, Math.max(0, Number(process.env.MAX_MODEL_RETRIES ?? 3)));
-  const started = Date.now();
   let formatRetry = false;
   let formatIssues = "";
   let formatCandidate: ModelCandidate | undefined;
@@ -179,8 +213,6 @@ export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prom
       const context = jobContext.getStore();
       if (context) {
         await store.checkpoint(cacheKey, result);
-        const taskJob = await store.getJob(context.jobId, (await store.checkpoint("ownerId")) as string);
-        await store.updateJob(context.jobId, { modelAudit: [...taskJob.modelAudit ?? [], { role: input.role, requestedModelId: input.requestedModelId, routedModelId: candidate.id, resolvedModelId: completion.modelId, durationMs: Date.now() - started, attempts: attempt + 1, createdAt: new Date().toISOString() }] });
         await store.appendEvent(context.jobId, { type: "model.completed", level: "info", safeMessage: input.role + " completed via " + completion.modelId + (attempt ? " after fallback/retry." : ".") });
       }
       return result;
@@ -194,12 +226,15 @@ export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prom
       if (!transient || transportRetries >= retries) throw error;
       transportRetries++;
       const failures = (health.get(candidate.id)?.failures ?? 0) + 1;
-      health.set(candidate.id, { failures, until: failures >= 2 ? Date.now() + 60_000 : 0 });
+      const rateLimited = error instanceof ProviderError && error.status === 429;
+      health.set(candidate.id, { failures, until: rateLimited || failures >= 2 ? Date.now() + 60_000 : 0 });
       const context = jobContext.getStore();
       if (context) await store.appendEvent(context.jobId, { type: "model.retry", level: "warning", safeMessage: "Free model temporarily unavailable. Retrying with an eligible free route." });
       await delay(Math.max(error instanceof ProviderError ? error.retryAfter : 0, Math.min(8000, 500 * 2 ** attempt + Math.random() * 300)), undefined, { signal });
     } finally {
-      recordSpan({ stage: input.prompt.match(/^ROLE: (\w+)/)?.[1] ?? input.role, outcome, durationMs: attemptDuration ?? performance.now() - attemptStart, model: attemptModel, attempt: attempt + 1, usage: attemptUsage, errorCode: outcome === "ok" ? undefined : errorCode });
+      const durationMs = attemptDuration ?? performance.now() - attemptStart;
+      recordSpan({ stage: input.prompt.match(/^ROLE: (\w+)/)?.[1] ?? input.role, outcome, durationMs, model: attemptModel, attempt: attempt + 1, usage: attemptUsage, errorCode: outcome === "ok" ? undefined : errorCode });
+      await appendModelAttempt(input, candidate, { durationMs, attempt: attempt + 1, outcome, errorCode, resolvedModelId: outcome === "ok" ? attemptModel : undefined });
     }
   }
   throw lastError ?? new Error("OpenRouter retry budget exhausted.");

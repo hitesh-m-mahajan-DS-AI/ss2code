@@ -95,13 +95,24 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .studio-dialog header { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
 .studio-dialog h2 { font-size: 20px; }
 .studio-dialog p, .studio-dialog summary { font-size: 12px; color: #bac7e4; }
-.history-projects { display: flex; flex-wrap: wrap; gap: 6px; }
+.history-projects { display: grid; gap: 6px; }
+.history-project-row { display: flex; gap: 8px; min-width: 0; }
+.history-project-row > button:first-child { flex: 1; justify-content: flex-start; overflow-wrap: anywhere; }
+.danger-button { color: #ffd4dc; border-color: rgba(255, 120, 148, .3); }
+.danger-button:not(:disabled):hover { color: #fff; border-color: rgba(255, 120, 148, .65); background: rgba(235, 79, 117, .18); }
 .history-list { padding: 0; list-style: none; }
 .history-list li { padding: 12px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 @media (max-width: 1100px) {
   .workspace { grid-template-columns: minmax(210px,.8fr) minmax(240px,1fr) minmax(300px,1.25fr); }
   .project-title input { min-width: 110px; }
 }
+
+.attempt-details { padding: 9px 12px 11px; border-top: 1px solid var(--line); color: #bdc8ff; font-size: 10px; }
+.attempt-details summary { cursor: pointer; font-weight: 650; }
+.attempt-log { display: grid; gap: 7px; max-height: 150px; overflow: auto; padding: 8px 0 0; margin: 0; list-style: none; }
+.attempt-log li { display: grid; gap: 3px; min-width: 0; }
+.attempt-log span { overflow-wrap: anywhere; color: #aab7d5; }
+.attempt-log small { color: #7886a6; }
 @media (max-width: 900px) {
   .workspace { display: block; height: auto; min-height: 0; padding-bottom: 0; }
   .mobile-tabs { display: grid; grid-template-columns: repeat(3,1fr); margin: 8px 0; }

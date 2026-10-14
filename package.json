@@ -18,7 +18,7 @@
     "documents": "tsx portfolio/document-assistant/cli.ts",
     "export:locks": "tsx scripts/export-locks.ts",
     "test:e2e": "tsx tests/studio.e2e.ts",
-    "lint": "eslint src scripts/benchmark.ts scripts/benchmark-fixtures.ts scripts/benchmark-compare.ts scripts/analytics.ts scripts/doctor.ts scripts/live-smoke.ts portfolio/document-assistant tests/analytics.test.ts tests/evaluation.test.ts tests/telemetry.test.ts tests/documents.test.ts tests/braces.test.ts tests/quality-gates.test.ts tests/output-contract.test.ts --max-warnings 0",
+    "lint": "eslint src scripts/benchmark.ts scripts/benchmark-fixtures.ts scripts/benchmark-compare.ts scripts/analytics.ts scripts/doctor.ts scripts/live-smoke.ts portfolio/document-assistant tests/analytics.test.ts tests/evaluation.test.ts tests/telemetry.test.ts tests/documents.test.ts tests/provider.test.ts tests/project-deletion.test.ts tests/braces.test.ts tests/quality-gates.test.ts tests/output-contract.test.ts --max-warnings 0",
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

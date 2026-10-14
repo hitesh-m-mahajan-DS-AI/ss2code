@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildIndex, retrieve, verifyCitations, assertFresh } from "../portfolio/document-assistant/retrieval";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 
@@ -25,4 +25,13 @@ test("document index detects edits and deletions instead of silently citing stal
     await rm(path.join(directory, "guide.md"));
     await assert.rejects(assertFresh(index), /changed/);
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("document challenge suite stays separate from the smoke regression and has explicit hard negatives", async () => {
+  const questions = JSON.parse(await readFile("portfolio/document-assistant/questions-challenge.json", "utf8")) as Array<{ id: string; difficulty: string; question: string; expectedFile: string | null }>;
+  assert.equal(questions.length, 20);
+  assert.ok(questions.some(item => item.difficulty === "paraphrase" && item.expectedFile));
+  assert.ok(questions.some(item => item.difficulty === "near-match-unanswerable" && item.expectedFile === null));
+  assert.ok(questions.some(item => item.difficulty === "injection-probe"));
+  assert.equal(new Set(questions.map(item => item.id)).size, questions.length);
 });

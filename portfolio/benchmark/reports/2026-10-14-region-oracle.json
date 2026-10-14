@@ -1,0 +1,41 @@
+{
+  "recordedAt": "2026-10-14",
+  "kind": "development-only-authored-oracle-instrument-check",
+  "runId": "63ebb14c-2b52-4b27-b8a5-f4ac0863d902",
+  "sourceCommit": "8c87f74e2d763258d707d234ee188f7623ea6cab",
+  "datasetHash": "125e34ddee15cd2bee105f2d11c131fb0b1676c2517693be97138ba2f040caab",
+  "sourceHashes": {
+    "scripts/benchmark.ts": "98bf14a08ecd9f82009105fae9d1474c2cfc74c970e1553fc90bd661606fd969",
+    "scripts/benchmark-fixtures.ts": "1d75b7d3a3ea3ed50b76208348b3e30dc8a9554c18d2f378f87e5b775769ca80",
+    "src/server/render-project.ts": "e73779ddb6d18f72f325b76beb3940be24cd21d0965c605c1a5dfcb9d11fb91c",
+    "src/server/visual-comparison.ts": "bce7e0162678625d38819f6f6873191fbfebdaf05c4a751b4cc22568c72dfcf9",
+    "src/evaluation/contracts.ts": "2e6d8ae4c0f1d26e7cd8e40faff9964526e0ca2dac9b479986f42ab6e108667e"
+  },
+  "scope": {
+    "split": "development only",
+    "cases": 12,
+    "independentTemplateGroups": 4,
+    "regionsPerCase": "5 to 7 authored DOM-mapped regions",
+    "typography": "one exact browser-measured page-title mapping per case",
+    "holdoutAccessed": false,
+    "liveInference": false
+  },
+  "results": {
+    "oracleCasesPassed": 12,
+    "oracleCasesAttempted": 12,
+    "meanRawPixelAgreement": 0.9992619736022079,
+    "meanRegionEdgeAbsoluteErrorPx": 0,
+    "maxRegionEdgeAbsoluteErrorPx": 0,
+    "adjacentRegionPairsChecked": 120,
+    "meanAdjacentRegionPairsPerCase": 10,
+    "verifiedTypographyChecks": 12,
+    "verifiedTypographyMismatches": 0,
+    "unverifiedTypographyChecks": 0,
+    "p95DurationMs": 5111.2864
+  },
+  "limitations": [
+    "This is authored oracle code rendered against its authored screenshot. It validates measurement wiring, not AI reconstruction or independent human labels.",
+    "The new dataset contains development families only; the original 24-case pilot manifest was not modified, and all six screenshot holdout cases remain unopened.",
+    "Four synthetic template families are insufficient to establish broad component generalization."
+  ]
+}

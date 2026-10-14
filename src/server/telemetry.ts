@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { jobContext } from "./job-context";
@@ -26,6 +26,26 @@ export function recordSpan(span: Span) {
     db.prepare("INSERT INTO spans VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(randomUUID(), trace.id, trace.source, trace.projectId ?? null, new Date(Date.now() - span.durationMs).toISOString(), label(span.stage), span.outcome, number(span.durationMs) ?? 0, label(span.model), number(span.attempt), label(span.errorCode), number(span.usage?.promptTokens), number(span.usage?.completionTokens), number(span.usage?.totalTokens), number(span.usage?.costCredits));
   } catch { console.warn("Operational telemetry unavailable; application work continues."); }
   finally { db?.close(); }
+}
+
+export function deleteOperationalTraces(traceIds: string[], projectIds: string[] = [], storageRoot = process.env.PRIVATE_STORAGE_ROOT ?? ".data/private") {
+  if (!traceIds.length && !projectIds.length) return true;
+  const databasePath = path.join(path.resolve(storageRoot), "telemetry.sqlite");
+  if (!existsSync(databasePath)) return true;
+  let db: DatabaseSync | undefined;
+  try {
+    db = new DatabaseSync(databasePath);
+    db.exec("PRAGMA busy_timeout=3000; BEGIN IMMEDIATE;");
+    const removeTrace = db.prepare("DELETE FROM spans WHERE trace_id = ?");
+    for (const traceId of traceIds) removeTrace.run(traceId);
+    const removeProject = db.prepare("DELETE FROM spans WHERE project_id = ?");
+    for (const projectId of projectIds) removeProject.run(projectId);
+    db.exec("COMMIT; PRAGMA wal_checkpoint(TRUNCATE); VACUUM; PRAGMA wal_checkpoint(TRUNCATE);");
+    return true;
+  } catch {
+    try { db?.exec("ROLLBACK;"); } catch { /* The transaction may already have committed. */ }
+    return false;
+  } finally { db?.close(); }
 }
 
 export async function measured<T>(stage: string, work: () => Promise<T>): Promise<T> {

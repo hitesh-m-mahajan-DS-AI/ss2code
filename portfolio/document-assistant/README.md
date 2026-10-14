@@ -11,6 +11,7 @@ npm run documents -- index
 npm run documents -- ask --question "Where do I configure OPENROUTER_API_KEY?"
 npm run documents -- ask --question "Where do I configure OPENROUTER_API_KEY?" --live
 npm run documents -- evaluate --check
+npm run documents -- evaluate --suite challenge
 ```
 
 Index your own permitted documents with `npm run documents -- index --root "C:\path\to\documents"`. This replaces the local index, so re-index the default corpus before running the bundled authored evaluation. Markdown and plain text only; PDF/OCR and web crawling are not implemented. Limits: 64 documents, 500 KB each, nesting depth six, question length 2,000 characters. Hidden files are skipped; symlinks, escaped paths and oversized files/lines are rejected.
@@ -24,6 +25,8 @@ Ingestion creates paragraph/line-aware chunks with stable source IDs, line range
 Before each query, additions, edits and deletions invalidate the index; re-index explicitly. The evidence schema permits only abstention and source-ID/exact-quote pairs. Fabricated IDs, modified quotes or quotes not in retrieved chunks cause the answer to be withheld. Sources and questions are untrusted data; the model has no action tools. A quoted instruction can still be malicious or irrelevant: source validity is not semantic correctness, and prompt injection is not proven solved.
 
 The default corpus is three original project help documents. Sixteen authored questions contain 12 answerable and four deliberately unrelated examples. Retrieval-only evaluation records recall@3, MRR, abstention and latency with document hashes. The recorded initial scores are recall@3 **1.0**, MRR **0.9583**, unrelated-question abstention **1.0**. This is a tiny, easy lexical smoke set, **not an LLM answer-accuracy result** or a representative semantic benchmark.
+
+A separate frozen [20-question challenge set](questions-challenge.json) contains paraphrases, answerable near-matches, unanswerable near-matches, unrelated questions and one injection probe. The current lexical-only baseline ([report](reports/retrieval-challenge.json)) achieved recall@3 **0.538**, MRR **0.538**, and unanswerable abstention **0.857**; paraphrase recall was **0.444** and near-match-unanswerable abstention was **0.75**. The injection probe returned no retrieved context. These scores expose lexical brittleness; they do **not** measure live model evidence selection, groundedness or injection resistance. Challenge outcomes are descriptive and are not eligible for tuning thresholds (`--check` remains limited to the fixed smoke suite).
 
 A separate live smoke query returned a verified configuration quote via free Nemotron. That establishes one working inference path, not general answer reliability. Expand questions with paraphrases, ambiguous/unanswerable near-matches, stale documents and adversarial passages before stronger claims. Keep development and held-out questions separate and report answer support/relevance by human review.
 

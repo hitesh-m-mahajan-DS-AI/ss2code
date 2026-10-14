@@ -19,6 +19,8 @@ The model catalog is public, so it can load before a key is configured. Actual i
 
 This implementation uses SQLite WAL and a private local object directory. Run web and worker processes on the **same host with the same private volume**, outside the public web root. It is not designed for an ephemeral serverless filesystem, network-shared SQLite, or independent multi-host replicas. Back up the SQLite database using SQLite's backup API and back up the asset/preview directory together.
 
+The project-history UI sends a same-origin, owner-scoped `DELETE /api/v1/projects/:projectId` request. It refuses projects with active jobs, then removes their stored references, job/task records, revisions, previews, bundles, diffs, candidate evidence, and job-level operational spans from the configured local volume. If local file cleanup cannot be verified, the response reports that explicitly. This is user-initiated local cleanup, not an automatic retention schedule or a guarantee against filesystem snapshots, SSD remanence, or external backups; preserve independent backups according to the operator's policy.
+
 1. Run npm ci, including development dependencies used by the build worker.
 2. Build the render image: docker build -f Dockerfile.render -t ss2code-render:local .
 3. Configure OPENROUTER_API_KEY, a random SESSION_SECRET, an absolute PRIVATE_STORAGE_ROOT, and SANDBOX_MODE=docker.

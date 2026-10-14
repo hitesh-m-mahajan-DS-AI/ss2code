@@ -30,3 +30,17 @@ test("routing excludes specialist classifiers and prefers suitable named free fa
   const candidates = eligibleModels([model("openrouter/free"), model("nvidia/nemotron-3.5-content-safety:free"), model("meta/llama-guard-4:free"), model("google/gemma-4:free")], "vision", 4000);
   assert.deepEqual(candidates.map(item => item.id), ["google/gemma-4:free", "openrouter/free"]);
 });
+
+test("review routing uses its own free-family preference and does not pin to the generation model", () => {
+  const preferred = process.env.MODEL_PREFERRED_FAMILIES, reviewPreferred = process.env.MODEL_REVIEW_PREFERRED_FAMILIES;
+  process.env.MODEL_PREFERRED_FAMILIES = "nemotron,gemma";
+  process.env.MODEL_REVIEW_PREFERRED_FAMILIES = "gemma,nemotron";
+  const models = ["nvidia/nemotron-3:free", "google/gemma-4:free"].map(id => normalizeModel({ id, context_length: 100000, architecture: { input_modalities: ["text"], output_modalities: ["text"] }, pricing: { prompt: "0", completion: "0" } }));
+  try {
+    assert.equal(eligibleModels(models, "code", 4000)[0].id, "nvidia/nemotron-3:free");
+    assert.equal(eligibleModels(models, "review", 4000, "nvidia/nemotron-3:free")[0].id, "google/gemma-4:free");
+  } finally {
+    if (preferred === undefined) delete process.env.MODEL_PREFERRED_FAMILIES; else process.env.MODEL_PREFERRED_FAMILIES = preferred;
+    if (reviewPreferred === undefined) delete process.env.MODEL_REVIEW_PREFERRED_FAMILIES; else process.env.MODEL_REVIEW_PREFERRED_FAMILIES = reviewPreferred;
+  }
+});

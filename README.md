@@ -1,6 +1,6 @@
 # Screenshot-to-Code Studio
 
-> Implementation status (14 October 2026): locally tested engineering prototype, not a proven reliable screenshot-to-code product. The recorded live reconstruction diagnostics remain 0/5 ready/exported; the latest green GitHub Actions run verifies engineering checks, not AI accuracy. This file and prompts.md define the target product specification. See the [measured evidence](portfolio/EVIDENCE.md), [reliability checklist](portfolio/RELIABILITY_CHECKLIST.md) and [remaining boundaries](portfolio/ARCHITECTURE.md) before making portfolio claims.
+> Implementation status (14 October 2026): locally tested engineering prototype, not a proven reliable screenshot-to-code product. The latest studio-diagnostic ledger is 0/6 ready/exported across changing prompts/configurations; it is not a pooled accuracy estimate. Green engineering checks verify code and workflow contracts, not AI reconstruction quality. This file and prompts.md define the target product specification. See the [measured evidence](portfolio/EVIDENCE.md), [reliability checklist](portfolio/RELIABILITY_CHECKLIST.md) and [remaining boundaries](portfolio/ARCHITECTURE.md) before making portfolio claims.
 
 > Also suitable for a product branded **PixelForge AI**: a reference-to-frontend studio that turns supplied UI evidence into an editable, validated frontend project.
 
@@ -27,6 +27,8 @@ For the four-track AI/ML/data-analytics portfolio extension, runnable experiment
 - Validate the generated project, render it in an isolated preview, compare it with the reference, and make bounded refinement passes.
 - Show a visual-diff score, generated files, assumptions, accessibility findings, and every generation/refinement event.
 - Export a clean project, copy an individual file, or continue refining with plain-language instructions.
+
+Project history also offers an explicit, owner-checked deletion action that removes a completed local project's references, jobs, revisions, previews, exports, and associated operational spans. The app blocks deletion while a job is active. This does not establish secure erasure from filesystem snapshots, SSD remanence, or backups, and no automatic retention policy is implemented.
 
 ## Product principles
 
@@ -294,6 +296,7 @@ Recommended configuration:
 ```bash
 MODEL_POLICY=free_only
 MODEL_PREFERRED_FAMILIES=nemotron,gemma
+MODEL_REVIEW_PREFERRED_FAMILIES=gemma,nemotron,qwen,llama,mistral,deepseek
 MAX_MODEL_RETRIES=3
 MAX_REFINEMENT_ITERATIONS=3
 REQUEST_TIMEOUT_MS=90000
@@ -374,7 +377,7 @@ Prioritize, in order: page structure, geometry, typography, colors/surfaces, ima
 ## Safety, privacy, and reliability
 
 - Store OpenRouter credentials in server-side secret storage; rotate keys without code changes.
-- Set upload/processing retention policy and provide project deletion that removes derived frames, previews, revisions, and exports.
+- Set an automatic upload/processing retention policy; local user-initiated project deletion removes derived frames, previews, revisions, exports, and job-level operational telemetry, but does not prove secure erasure from filesystem snapshots, SSD remanence, or backups.
 - Strip EXIF/location metadata from generated previews where possible; retain originals only as long as the user’s retention policy allows.
 - Validate MIME type by content, use malware scanning where deployment requirements call for it, and never execute upload/archive contents.
 - Use isolated, resource-capped, network-restricted build workers. Apply an npm/package allowlist and block post-install scripts unless explicitly required and reviewed.

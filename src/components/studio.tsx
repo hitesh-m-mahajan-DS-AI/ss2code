@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { AlertCircle, ArrowLeftRight, Check, ChevronDown, ClipboardPaste, CloudUpload, Download, FileImage, FileVideo, ImageIcon, Info, LoaderCircle, LockKeyhole, Plus, RefreshCw, Sparkles, Undo2, Upload, WandSparkles, X, ZoomIn } from "lucide-react";
+import { AlertCircle, ArrowLeftRight, Check, ChevronDown, ClipboardPaste, CloudUpload, Download, FileImage, FileVideo, ImageIcon, Info, LoaderCircle, LockKeyhole, Plus, RefreshCw, Sparkles, Trash2, Undo2, Upload, WandSparkles, X, ZoomIn } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent } from "react";
 import type { GenerationJob, JobEvent, ModelCandidate, Revision, StoredAsset, VisualSpec } from "@/lib/domain";
 import { visualSpecSchema } from "@/lib/schemas";
@@ -153,6 +153,8 @@ export function Studio() {
   const [revisions, setRevisions] = useState<Revision[]>([]);
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string }>();
+  const [deletingProject, setDeletingProject] = useState(false);
   const [locked, setLocked] = useState<string[]>([]);
   const sourceRef = useRef<EventSource | null>(null);
   const [dragDepth, setDragDepth] = useState(0);
@@ -204,6 +206,28 @@ export function Studio() {
     const id = crypto.randomUUID(); setProjectId(id); localStorage.setItem("ss2-project", id);
     setReference(undefined); setVisualSpec(undefined); setRevision(undefined); setJob(undefined); setEvents([]); setRevisions([]); setFrames([]); setLocked([]);
     setStatus("idle"); setStatusMessage("Drop a reference to begin."); setProjectName("Untitled reconstruction");
+  }
+
+  async function deleteProject() {
+    if (!projectToDelete || deletingProject) return;
+    setDeletingProject(true);
+    try {
+      const response = await fetch(`/api/v1/projects/${encodeURIComponent(projectToDelete.id)}`, { method: "DELETE", headers: mutationHeaders() });
+      const body = await response.json() as { error?: string; cleanupComplete?: boolean };
+      if (!response.ok) throw new Error(body.error ?? "Project deletion could not be completed.");
+      const deletedId = projectToDelete.id;
+      setProjects(current => current.filter(project => project.id !== deletedId));
+      setProjectToDelete(undefined);
+      if (deletedId === projectId) {
+        newProject();
+        setStatusMessage(body.cleanupComplete === false ? "Project records were removed, but local file cleanup could not be fully verified." : "Project and stored artifacts deleted. A fresh project is ready.");
+      } else {
+        setStatus(body.cleanupComplete === false ? "error" : "ready");
+        setStatusMessage(body.cleanupComplete === false ? "Project records were removed, but local file cleanup could not be fully verified." : "Project and stored artifacts deleted from this local workspace.");
+      }
+    } catch (error) {
+      setStatus("error"); setStatusMessage(errorText(error));
+    } finally { setDeletingProject(false); }
   }
 
   async function retryJob() {
@@ -556,7 +580,7 @@ export function Studio() {
         <BlueprintTree tree={job?.componentTree} plan={job?.filePlan} />
         {job && ["failed", "cancelled"].includes(job.phase) && <button type="button" className="secondary-button wide" onClick={() => void retryJob()}>Retry safely</button>}
         <div className="progress-track" aria-label={`Job progress ${progress}%`}><motion.div className="progress-value" animate={{ width: `${progress}%` }} transition={{ duration: 0.25 }} /></div>
-        <section className="activity-card"><div className="activity-card-heading"><span>Safe job events</span>{job && <small>{job.id.slice(0, 8)}</small>}</div>{events.length ? <ol className="event-log">{events.map((event) => <li key={event.sequence} className={event.level}><span /><div><strong>{event.type.replaceAll(".", " ")}</strong><p>{event.safeMessage}</p></div><time>{new Date(event.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time></li>)}</ol> : <div className="empty-events"><LoaderCircle size={16} /><span>{visualSpec ? "Ready to generate from the approved blueprint." : "The visual plan appears here after inspection."}</span></div>}</section>
+        <section className="activity-card"><div className="activity-card-heading"><span>Safe job events</span>{job && <small>{job.id.slice(0, 8)}</small>}</div>{events.length ? <ol className="event-log">{events.map((event) => <li key={event.sequence} className={event.level}><span /><div><strong>{event.type.replaceAll(".", " ")}</strong><p>{event.safeMessage}</p></div><time>{new Date(event.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time></li>)}</ol> : <div className="empty-events"><LoaderCircle size={16} /><span>{visualSpec ? "Ready to generate from the approved blueprint." : "The visual plan appears here after inspection."}</span></div>}{Boolean(job?.modelAudit?.length) && <details className="attempt-details"><summary>Provider attempts ({job!.modelAudit!.length})</summary><ol className="attempt-log">{job!.modelAudit!.map((attempt, index) => <li key={`${attempt.createdAt}-${index}`}><span>{attempt.role} · {attempt.routedModelId}</span><small>{attempt.outcome ? `attempt ${attempt.attemptNumber ?? 1} · ${attempt.outcome === "ok" ? "succeeded" : `${attempt.outcome}: ${attempt.errorCode ?? "unknown"}`}` : `${attempt.attempts} attempt(s)`} · {(attempt.durationMs / 1000).toFixed(1)}s</small></li>)}</ol></details>}</section>
         {visualSpec ? <section className="spec-card"><div className="mini-heading"><span>Visual Spec</span><button type="button" onClick={() => setSpecEditing((value) => !value)}>{specEditing ? "Cancel" : "Edit JSON"}</button></div>{specEditing ? <><textarea className="json-editor" value={specText} onChange={(event) => setSpecText(event.target.value)} aria-label="Editable Visual Spec JSON" /><button type="button" className="secondary-button" onClick={saveSpecEdits}><Check size={15} /> Save edits</button></> : <><div className="spec-facts"><div><small>Viewport</small><strong>{visualSpec.reference.viewport.width} × {visualSpec.reference.viewport.height}</strong></div><div><small>Confidence</small><strong>{visualSpec.reference.confidence}</strong></div><div><small>Regions</small><strong>{visualSpec.observations.layout.length}</strong></div></div><ul>{visualSpec.observations.hierarchy.slice(0, 4).map((item) => <li key={item}>{item}</li>)}</ul>{visualSpec.assumptions.length > 0 && <details><summary>{visualSpec.assumptions.length} recorded assumption{visualSpec.assumptions.length === 1 ? "" : "s"}</summary>{visualSpec.assumptions.map((item) => <p key={item.detail}><strong>{item.detail}</strong> — {item.conservativeDefault}</p>)}</details>}</>}</section> : <section className="inspect-card"><Info size={18} /><div><strong>Inspect before code</strong><p>Observed facts, unknown details, and constrained assumptions remain visible before the model can generate.</p></div></section>}
         <div className="build-action">{job && !["ready", "failed", "cancelled"].includes(job.phase) ? <button type="button" className="secondary-button wide" onClick={() => void cancelJob()}><X size={16} /> Cancel safely</button> : <button type="button" className="primary-button wide" onClick={() => visualSpec ? void generate() : void analyse()} disabled={!reference?.assetId || status === "uploading" || status === "processing"}>{visualSpec ? <><WandSparkles size={17} /> Generate validated build</> : <><ZoomIn size={17} /> Inspect reference</>}</button>}{modelError && <p className="inline-error"><AlertCircle size={14} /> {modelError}</p>}</div>
       </section>
@@ -569,7 +593,8 @@ export function Studio() {
     <footer className="command-bar glass"><button type="button" className="command-attach" onClick={() => fileInput.current?.click()} aria-label="Replace reference" disabled={busy}><Plus size={17} /></button><input ref={commandInput} value={command} onChange={(event) => setCommand(event.target.value)} onKeyDown={commandSubmit} placeholder="Refine the approved build…" aria-label="Targeted refinement instruction" /><kbd>Ctrl K</kbd><button type="button" className="primary-button command-submit" onClick={() => { if (command.trim()) void startUserRefinement(command.trim()); }} disabled={!command.trim() || !revision || busy}><Sparkles size={15} /> Refine</button></footer>
     <p className={`live-status ${status === "error" ? "error" : ""}`} aria-live="polite">{status === "processing" || status === "uploading" ? <LoaderCircle size={14} className="spin" /> : status === "error" ? <AlertCircle size={14} /> : <Check size={14} />}{statusMessage}</p>
 
-    {showHistory && <Modal title="Project history" onClose={() => setShowHistory(false)}><div className="history-projects">{projects.map(item => <button type="button" className="secondary-button" disabled={busy} key={item.id} onClick={() => void restoreProject(item.id)}>{item.name}</button>)}</div><p>Revisions are immutable. Undo and redo select earlier or later ready revisions.</p>{revisions.length ? <ol className="history-list">{revisions.map(item => <li key={item.id}><button type="button" className="secondary-button" onClick={() => { void loadRevision(item.id); setShowHistory(false); }}>{new Date(item.createdAt).toLocaleString()} · {item.files.length} files</button><p>{item.modelId} · {Math.round((item.evaluation.metrics.visualScore ?? 0) * 100)}% pixel agreement</p><details><summary>Model routing</summary>{item.modelAudit?.map((audit, i) => <p key={i}>{audit.role}: {audit.resolvedModelId} · {(audit.durationMs / 1000).toFixed(1)}s · {audit.attempts} attempt(s)</p>)}</details></li>)}</ol> : <p>No ready revisions yet. Upload a reference to start.</p>}</Modal>}
+    {showHistory && <Modal title="Project history" onClose={() => setShowHistory(false)}><div className="history-projects">{projects.map(item => <div className="history-project-row" key={item.id}><button type="button" className="secondary-button" disabled={busy || deletingProject} onClick={() => void restoreProject(item.id)}>{item.name}</button><button type="button" className="secondary-button danger-button" aria-label={`Delete project ${item.name} ${item.id.slice(0, 8)}`} disabled={busy || deletingProject} onClick={() => { setShowHistory(false); setProjectToDelete(item); }}><Trash2 size={14} /> Delete</button></div>)}</div><p>Revisions are immutable. Undo and redo select earlier or later ready revisions.</p>{revisions.length ? <ol className="history-list">{revisions.map(item => <li key={item.id}><button type="button" className="secondary-button" onClick={() => { void loadRevision(item.id); setShowHistory(false); }}>{new Date(item.createdAt).toLocaleString()} · {item.files.length} files</button><p>{item.modelId} · {Math.round((item.evaluation.metrics.visualScore ?? 0) * 100)}% pixel agreement</p><details><summary>Model routing</summary>{item.modelAudit?.map((audit, i) => <p key={i}>{audit.role}: {audit.resolvedModelId} · {audit.outcome ? `attempt ${audit.attemptNumber ?? 1} · ${audit.outcome === "ok" ? "succeeded" : `${audit.outcome} (${audit.errorCode ?? "unknown error"})`}` : `${audit.attempts} attempt(s)`} · {(audit.durationMs / 1000).toFixed(1)}s</p>)}</details></li>)}</ol> : <p>No ready revisions yet. Upload a reference to start.</p>}</Modal>}
+    {projectToDelete && <Modal title="Delete project" onClose={() => { if (!deletingProject) setProjectToDelete(undefined); }}><p>This permanently removes <strong>{projectToDelete.name}</strong> <code>{projectToDelete.id.slice(0, 8)}</code> from this local workspace, including its references, job history, revisions, previews, and export artifacts.</p><p>Deletion is unavailable while a generation is active. This action cannot be undone.</p><button type="button" className="secondary-button danger-button" onClick={() => void deleteProject()} disabled={deletingProject || busy}>{deletingProject ? <LoaderCircle size={15} className="spin" /> : <Trash2 size={15} />} Delete permanently</button></Modal>}
     {showShortcuts && <Modal title="Keyboard shortcuts" onClose={() => setShowShortcuts(false)}><p>Ctrl/Cmd + V: paste image</p><p>Ctrl/Cmd + K: focus refinement</p><p>[ / ]: switch workspace panels</p><p>Esc: close dialog</p></Modal>}
   </main>;
 }

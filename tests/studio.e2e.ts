@@ -131,9 +131,12 @@ try {
   const recovered = await (await context.request.get(origin + "/api/v1/projects?project=" + projectId)).json();
   assert.equal(recovered.job?.id, initial.job.id);
   assert.equal(recovered.job?.phase, "failed");
+  await db.updateJob(initial.job.id, { modelAudit: [{ role: "code", routedModelId: "google/gemma-example:free", resolvedModelId: "google/gemma-example:free", durationMs: 90001, attempts: 1, outcome: "error", errorCode: "HTTP_429", createdAt: new Date().toISOString() }] });
   await page.reload();
   await page.getByText("Project restored.", { exact: false }).waitFor();
   await page.getByRole("button", { name: "Build", exact: true }).click();
+  await page.getByText("Provider attempts (1)").click();
+  await page.getByText(/error: HTTP_429/).waitFor();
   await page.getByRole("button", { name: "Retry safely", exact: true }).waitFor();
   await page.getByRole("button", { name: "Reference", exact: true }).click();
   await page.getByRole("button", { name: "New project", exact: true }).click();
@@ -160,8 +163,19 @@ try {
   assert.equal(await page.locator(".frame-row button").count(), 3);
   await page.locator(".frame-row button").nth(1).click();
   await page.locator(".live-status").filter({ hasText: "Selected the" }).waitFor();
+  assert.equal((await unauthorized.request.delete(origin + "/api/v1/projects/" + projectId, { headers: { Origin: origin } })).status(), 404);
+  assert.equal((await context.request.delete(origin + "/api/v1/projects/" + projectId, { headers: { Origin: "https://unrelated.example" } })).status(), 403);
+  const activeJob = await db.createJob(projectId, ownerId);
+  assert.equal((await context.request.delete(origin + "/api/v1/projects/" + projectId, { headers: { Origin: origin } })).status(), 409);
+  await db.updateJob(activeJob.id, { phase: "failed" });
+  await page.getByRole("button", { name: "History", exact: true }).click();
+  await page.getByRole("button", { name: /Delete project Dashboard reference\.png/ }).click();
+  const deleteDialog = page.getByRole("dialog", { name: "Delete project" });
+  await deleteDialog.getByRole("button", { name: "Delete permanently" }).click();
+  await page.getByText("Project and stored artifacts deleted from this local workspace.", { exact: true }).waitFor();
+  assert.equal((await context.request.get(origin + "/api/v1/projects?project=" + projectId)).status(), 404);
   assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
-  console.log("Independent export install/build, ownership, CSRF, idempotent replay, failure recovery, upload persistence and video frame selection passed.");
+  console.log("Independent export install/build, ownership, CSRF, idempotent replay, failure recovery, upload persistence, video frame selection and project deletion passed.");
 } catch (error) {
   for (const context of browser.contexts()) {
     const failurePage = context.pages()[0];

@@ -4,7 +4,7 @@
 
 `npm run benchmark:fixtures` captures 24 original pages in Chromium: dashboard, table, settings, login, editorial, pricing, catalog and status, each in desktop/mobile/dark variants. The authoring code is the provenance source; no third-party screenshots or trademarks are scraped. References and their SHA-256 hashes live in `.data/benchmarks/pilot/manifest.json`.
 
-Splits are by **template family**, not screenshot: development has four families/12 cases; validation two/six; sealed holdout two/six. Variant overlap across splits is rejected. Selection rotates across families before variants. Ground truth currently includes visible text and one page-level region; it does not yet measure detailed component segmentation. Fixtures do not represent arbitrary websites, motion, popovers, real asset libraries or diverse scripts/fonts.
+Splits are by **template family**, not screenshot: development has four families/12 cases; validation two/six; sealed holdout two/six. Variant overlap across splits is rejected. Selection rotates across families before variants. The original 24-case pilot manifest has visible text and one page-level region. A separate development-only region dataset is described below; it does not change the original manifest. Fixtures do not represent arbitrary websites, motion, popovers, real asset libraries or diverse scripts/fonts.
 
 The manifest contains oracle code for infrastructure self-tests. Live lanes receive the reference image/viewport and their own model-produced intermediate outputs, **not oracle source or truth**. Truth is used by evaluation only.
 
@@ -12,6 +12,8 @@ The manifest contains oracle code for infrastructure self-tests. Live lanes rece
 
 ```powershell
 npm run benchmark:fixtures
+npm run benchmark:fixtures -- --split development --output .data/benchmarks/region-development
+npm run benchmark:run -- --lane self-test --split development --limit 12 --manifest .data/benchmarks/region-development/manifest.json
 npm run benchmark:run -- --lane self-test --limit 12
 npm run benchmark:run -- --lane self-test --split validation --limit 6
 npm run benchmark:run -- --lane direct --limit 4 --repeats 2
@@ -37,7 +39,13 @@ Completion requires a rendered candidate with no horizontal overflow, serious/cr
 
 The renderer records each uniquely mapped region's signed left/top/right/bottom edge error in CSS pixels and material horizontal/vertical gaps between adjacent mapped regions. Typography is measured from browser-computed styles on an explicitly marked text element (`data-ss2-typography`) inside the exact approved layout region. A typography mismatch blocks publication only when the observation is high-confidence and tied to an exact region; ambiguous or unmapped targets remain unverified. Material edge errors in critical regions also block. Existing pixel, text and aggregate geometry thresholds were retained; none were lowered.
 
-This improves diagnosis and gate safety, not AI accuracy. Unless an independent oracle is supplied, these measurements compare with the model-produced VisualSpec. Authored benchmark truth still has only a page-level region, so it cannot establish component-level generalization or validate P02 region accuracy. Expand and independently review region-level truth before publishing component/layout quality claims.
+This improves diagnosis and gate safety, not AI accuracy. Unless an independent oracle is supplied, production measurements compare with the model-produced VisualSpec. The original 24-case pilot still has only a page-level region and cannot establish P02 region accuracy.
+
+### Development-only region oracle instrument check (14 October 2026)
+
+The fixture authoring CLI can build a **separate** 12-case development dataset with 5–7 explicit DOM-mapped regions and one computed page-title typography label per screenshot. The documented `--split development` command skips both validation and holdout categories. The [sanitized report](reports/2026-10-14-region-oracle.json) records 12/12 authored oracle checks, mean raw pixel agreement 0.9993, zero mapped edge error, 120 adjacent-region spacing relations checked (10 per case on average), and 12/12 verified typography measurements without a mismatch. A first run exposed invalid JSX serialization for void inputs and an implicit bold-weight assumption under Tailwind reset; those fixture defects were corrected before the reported rerun, and the failed run remains privately retained.
+
+This validates region/typography instrumentation against the same authored source used to produce the screenshot. It is **not an AI success rate, independent human annotation, or a reconstruction benchmark**. The new region dataset is local/ignored and separate; it does not overwrite the original pilot manifest, validation data or six sealed screenshot holdouts. Four development template families remain too few to establish component generalization.
 
 New benchmark summaries include mean/max absolute region-edge error, the count of adjacent-region pairs checked, the mean/count of material spacing deviations, and verified/unverified typography-check counts. These remain conditional on successful rendered candidates and actual measurement coverage; absent metrics stay missing, not zero. Historical reports have not been rewritten.
 

@@ -35,7 +35,7 @@ export type ModelCandidate = {
 };
 
 export type ComponentTree = { id: string; type: string; semanticRole: string; visualRegion: string; children: ComponentTree[]; interactions?: string[]; confidence: "high" | "medium" | "low" };
-export type ModelAudit = { role: ModelRole; requestedModelId?: string; routedModelId: string; resolvedModelId: string; durationMs: number; attempts: number; createdAt: string };
+export type ModelAudit = { role: ModelRole; requestedModelId?: string; routedModelId: string; resolvedModelId: string; durationMs: number; attempts: number; attemptNumber?: number; outcome?: "ok" | "error" | "schema_error"; errorCode?: string; createdAt: string };
 
 export type VisualSpec = {
   reference: { viewport: { width: number; height: number }; pageType: string; confidence: "high" | "medium" | "low" };

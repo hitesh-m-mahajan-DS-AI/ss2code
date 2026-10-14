@@ -50,6 +50,7 @@ OPENROUTER_HTTP_REFERER=http://localhost:3000
 OPENROUTER_APP_TITLE=Screenshot-to-Code Studio
 MODEL_POLICY=free_only
 MODEL_PREFERRED_FAMILIES=nemotron,gemma
+MODEL_REVIEW_PREFERRED_FAMILIES=gemma,nemotron,qwen,llama,mistral,deepseek
 PRIVATE_STORAGE_ROOT=.data/private
 SANDBOX_MODE=process
 SANDBOX_IMAGE=ss2code-render:local
@@ -214,7 +215,7 @@ The repository and exported ZIPs include the documented [bounded braces fork](ve
 | Old projects disappear | Use the same browser profile, origin/port, session secret, and private storage. Clearing the ownership cookie loses access; there is no account recovery system. |
 | Typecheck/build conflict while dev is running | Stop the studio, then rerun verification. Do not delete private data as a build-cache fix. |
 
-Keep .data/private: it contains your references, revisions, and queue. Do not clear it during troubleshooting. Use local disk for this data and keep backups. Never disable antivirus, remove sandboxing from production, or expose a Node debugger publicly to work around a startup error.
+Keep .data/private: it contains your references, revisions, and queue. Do not clear it during troubleshooting. To intentionally remove one completed project, use History → Delete and confirm; active projects cannot be deleted. This removes that project's local records and associated files, but is not secure erasure from filesystem snapshots, SSD remanence, or backups. Use local disk and keep backups for data you want to retain. Never disable antivirus, remove sandboxing from production, or expose a Node debugger publicly to work around a startup error.
 
 ## Repository map
 

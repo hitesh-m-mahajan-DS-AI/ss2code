@@ -39,4 +39,4 @@ Local text corpus → hashed lexical index → retrieved passages → verified q
 
 ## Remaining product boundaries
 
-These portfolio additions do not claim to implement every aspirational item in the root specification. Full account recovery, multi-tenant cloud scaling, automatic retention/deletion, broader design/PDF/ZIP ingestion, multi-state reconstruction and real-user accessibility testing need separate implementation/validation. Existing supported image/video/paste, component tree, preview/compare, inspector, history and export functionality is preserved.
+These portfolio additions do not claim to implement every aspirational item in the root specification. User-initiated owner-scoped local project deletion is implemented, but automatic retention schedules, account recovery, multi-tenant cloud scaling, secure-erasure certification, broader design/PDF/ZIP ingestion, multi-state reconstruction and real-user accessibility testing need separate implementation/validation. Existing supported image/video/paste, component tree, preview/compare, inspector, history and export functionality is preserved.

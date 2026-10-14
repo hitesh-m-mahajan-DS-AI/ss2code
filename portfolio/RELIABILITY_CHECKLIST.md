@@ -27,6 +27,11 @@ Updated 14 October 2026. README.md and prompts.md remain the authoritative targe
 - [x] Add signed per-region CSS-pixel edge deltas and material adjacent-region spacing diagnostics without lowering existing geometry/pixel/text thresholds.
 - [x] Measure browser-computed typography only through exact region IDs and explicit element markers; treat missing/ambiguous legacy mappings as unverified, and fail closed on high-confidence mapped title mismatches in critical regions.
 - [x] Add a real-browser regression proving that a high global pixel score can coexist with a blocking mapped typography mismatch.
+- [x] Persist each live provider attempt (route, duration, success/schema/provider outcome, bounded error code) on the active job and expose it in the studio activity panel; raw provider errors and prompt/image data remain excluded.
+- [x] Put a provider route on cooldown immediately after HTTP 429, retain bounded retries, and rank mandatory review calls with an independent zero-price model-family preference instead of forcing the generation model; both behaviors have deterministic routing tests.
+- [x] Add a separate 20-question document retrieval challenge suite with paraphrase, near-match, unanswerable and injection-probe slices; retain its descriptive baseline separately from the fixed smoke regression.
+- [x] Add a separate development-only authored screenshot dataset with 5–7 mapped regions and measured title typography; its 12/12 oracle self-test validates the measurement path without opening the screenshot holdout.
+- [x] Add explicit owner-checked same-origin project deletion, block it while jobs are active, remove associated private files/queue/history/previews/job telemetry, and report incomplete local cleanup; secure erase/backups are not claimed.
 
 ## Release verification
 
@@ -47,10 +52,12 @@ npm run build
 ## Not certified or silently marked complete
 
 - Arbitrary-website pixel-perfect reconstruction, dependable free-provider availability or production accuracy. The earlier six-attempt benchmark pilot was 0/6; retain that denominator. Small authored samples and studio acceptance are not independent visual proof.
-- Region-level AI accuracy or component-level generalization. The new renderer can measure mapped styles and geometric relations, but the current benchmark's oracle truth remains page-level and the live VisualSpec is model-produced.
+- The latest studio diagnostic ledger is 0/6 ready/exported across configurations. Its newest one-case run failed during generation after two HTTP 429 responses, one HTTP 502 response and a 90-second timeout; better audit visibility is not a reconstruction fix.
+- Region-level AI accuracy or component-level generalization. The original benchmark truth remains page-level and live VisualSpecs are model-produced. The separate 12-case region oracle uses the same authored DOM/source that generated its screenshots, so it validates the instrument rather than independent AI accuracy.
 - Nominal 90% forecast coverage. The measured historical run remains 72.6% and blocked; fixing promotion safety does not change its statistics. A new untouched labelled period is needed for a defensible model-improvement claim.
 - Broad document reasoning/retrieval quality. Sixteen authored lexical questions are a smoke test, not a representative semantic/LLM evaluation or proof against all prompt injection.
-- Full account recovery, automatic retention/deletion, PDF/design/ZIP ingestion, multi-reference/multi-state reconstruction, multi-tenant scaling and real-user accessibility evaluation. These remain product work; existing supported features are preserved.
+- The separate 20-question challenge set remains a small authored lexical retrieval-only test. It does not score live LLM answers, human relevance, citation groundedness, or prompt-injection resistance.
+- Full account recovery, automatic retention schedules, secure-erasure guarantees, PDF/design/ZIP ingestion, multi-reference/multi-state reconstruction, multi-tenant scaling and real-user accessibility evaluation. These remain product work; user-initiated local project deletion is implemented, and existing supported features are preserved.
 - Public deployment or off-host restore certification. The user explicitly chose local implementation/testing without infrastructure purchase. Docker and local export verification do not establish these outcomes.
 
 Evidence is traceable, not tamper-proof: source hashes and local files are not a signed immutable audit store. A clean npm audit does not assess the vendored fork. Automated accessibility/pixel checks do not replace independent human review.

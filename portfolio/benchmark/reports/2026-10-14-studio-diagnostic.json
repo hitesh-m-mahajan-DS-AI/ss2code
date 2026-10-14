@@ -1,0 +1,43 @@
+{
+  "recordedAt": "2026-10-14",
+  "kind": "local-live-studio-diagnostic",
+  "runId": "86ccd383-0217-40b7-99d8-eace441d439d",
+  "sourceCommit": "8c87f74",
+  "promptVersion": "studio-prompts@1.5.0",
+  "datasetHash": "d3b6d382405286977fa364a1a714b4a9cfc5af058e60743857d9677fa2db1979",
+  "caseIds": ["dashboard-desktop"],
+  "scope": "One authored development reference through real upload, analysis, blueprint, generation, validation, review and export workflow. No holdout, oracle source or oracle truth was sent to inference.",
+  "routing": {
+    "inferenceProvider": "OpenRouter only",
+    "pricePolicy": "provider.max_price prompt=0 completion=0",
+    "preferredFamilies": ["nemotron", "gemma"],
+    "maxRetries": 3,
+    "requestTimeoutMs": 90000,
+    "sandbox": "Docker"
+  },
+  "outcome": {
+    "attempted": 1,
+    "ready": 0,
+    "exported": 0,
+    "failurePhase": "generation",
+    "elapsedMs": 247396,
+    "publishedRevision": false
+  },
+  "providerObservations": [
+    { "stage": "visual-spec analysis", "model": "google/gemma-4-26b-a4b-it:free", "outcome": "HTTP_429" },
+    { "stage": "visual-spec analysis", "model": "google/gemma-4-31b-it:free", "outcome": "HTTP_429" },
+    { "stage": "visual-spec analysis", "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", "outcome": "success" },
+    { "stage": "blueprint", "model": "nvidia/nemotron-3-super-120b-a12b:free", "outcome": "success", "calls": 3 },
+    { "stage": "code generation", "model": "google/gemma-4-26b-a4b-it:free", "outcome": "HTTP_429" },
+    { "stage": "code generation", "model": "google/gemma-4-31b-it:free", "outcome": "HTTP_429" },
+    { "stage": "code generation", "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", "outcome": "HTTP_502" },
+    { "stage": "code generation", "model": "dots-studio/dots-3-note-preview:free", "outcome": "TIMEOUT", "durationMs": 90006 }
+  ],
+  "limitations": [
+    "One authored case is diagnostic evidence, not a quality estimate or arbitrary-site generalization claim.",
+    "The live model-produced VisualSpec was submitted automatically without human correction; no independent visual review was performed.",
+    "Studio acceptance was not reached, so no candidate pixel/fidelity metrics or export were produced.",
+    "The failure happened before the per-attempt job-audit change; equivalent route/error/latency data came from private operational telemetry. New deterministic tests verify the job audit and UI path.",
+    "Free-route availability is dynamic. A zero-price-only policy and bounded retries constrain cost; they do not guarantee availability or quality."
+  ]
+}

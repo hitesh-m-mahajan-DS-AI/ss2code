@@ -1,6 +1,43 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getLiveModelCatalog, structuredOpenRouterCall } from "../src/server/openrouter";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { appendModelAttempt, getLiveModelCatalog, modelAuditAttempt, structuredOpenRouterCall } from "../src/server/openrouter";
+import { jobContext } from "../src/server/job-context";
+import { LocalProjectStore } from "../src/server/repository";
+
+test("failed provider attempts are persisted to the active job without raw errors", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "ss2-provider-audit-"));
+  const attemptStore = new LocalProjectStore(directory);
+  try {
+    await attemptStore.createAsset({ projectId: "project", ownerId: "owner", name: "fixture", kind: "asset_archive", mimeType: "application/octet-stream", bytes: 1, bytesData: Buffer.from("x") });
+    const job = await attemptStore.createJob("project", "owner", { kind: "generation", ownerId: "owner", data: {} });
+    const lease = await attemptStore.claim();
+    assert.ok(lease);
+    await jobContext.run({ jobId: job.id, lease: lease.lease, signal: new AbortController().signal }, async () => {
+      await attemptStore.checkpoint("ownerId", "owner");
+      await appendModelAttempt({ role: "code" }, { id: "google/gemma-example:free", family: "gemma", inputModalities: ["image"], outputModalities: ["text"], isFreeCandidate: true }, { durationMs: 90001, attempt: 1, outcome: "error", errorCode: "HTTP_429" }, attemptStore);
+    });
+    const saved = await attemptStore.getJob(job.id, "owner");
+    assert.equal(saved.modelAudit?.[0]?.outcome, "error");
+    assert.equal(saved.modelAudit?.[0]?.errorCode, "HTTP_429");
+    assert.equal(saved.modelAudit?.[0]?.routedModelId, "google/gemma-example:free");
+    assert.equal("rawError" in (saved.modelAudit?.[0] ?? {}), false);
+  } finally { attemptStore.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test("provider attempt audit retains failed routes using safe outcome codes only", () => {
+  const candidate = { id: "google/gemma-example:free", family: "gemma", inputModalities: ["image"], outputModalities: ["text"], isFreeCandidate: true };
+  const audit = modelAuditAttempt({ role: "code" }, candidate, { durationMs: 90_001, attempt: 4, outcome: "error", errorCode: "TIMEOUT" });
+  assert.equal(audit.routedModelId, "google/gemma-example:free");
+  assert.equal(audit.resolvedModelId, "google/gemma-example:free");
+  assert.equal(audit.outcome, "error");
+  assert.equal(audit.errorCode, "TIMEOUT");
+  assert.equal(audit.attempts, 1);
+  assert.equal(audit.attemptNumber, 4);
+  assert.equal("rawError" in audit, false);
+});
 
 test("plan-bound generation rejects duplicate files before build and gives one field-level format retry", async () => {
   const original = globalThis.fetch, key = process.env.OPENROUTER_API_KEY;
@@ -48,6 +85,32 @@ test("OpenRouter retries a transient failure via a free fallback and records the
     assert.deepEqual(routes, ["google/gemma-test:free", "openrouter/free"]);
     assert.equal(result.modelId, "google/gemma-resolved:free");
   } finally { globalThis.fetch = original; if (key === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = key; }
+});
+
+test("HTTP 429 immediately cools down that free route so later stages use a fallback", async () => {
+  const original = globalThis.fetch, key = process.env.OPENROUTER_API_KEY, retries = process.env.MAX_MODEL_RETRIES, preferred = process.env.MODEL_PREFERRED_FAMILIES;
+  process.env.OPENROUTER_API_KEY = "test-only-not-a-real-key"; process.env.MAX_MODEL_RETRIES = "1"; process.env.MODEL_PREFERRED_FAMILIES = "gemma,nemotron";
+  const requests: string[] = [];
+  const value = { kind: "image", readiness: "ready", likelyRole: "primary", nextAction: "Inspect", safeNotes: [] };
+  globalThis.fetch = (async (url, options) => {
+    if (String(url).endsWith("/models")) return Response.json({ data: ["google/gemma-cooldown-test:free", "nvidia/nemotron-fallback-test:free"].map(id => ({ id, pricing: { prompt: "0", completion: "0" }, context_length: 128000, architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } })) });
+    const body = JSON.parse(String(options?.body)) as { model: string };
+    requests.push(body.model);
+    if (body.model.includes("gemma")) return new Response("", { status: 429 });
+    return Response.json({ model: body.model, choices: [{ message: { content: JSON.stringify(value) } }] });
+  }) as typeof fetch;
+  try {
+    await getLiveModelCatalog(true);
+    const first = await structuredOpenRouterCall({ role: "vision", prompt: "ROLE: REFERENCE_CLASSIFIER\nInspect the first stage." });
+    const nextStage = await structuredOpenRouterCall({ role: "vision", prompt: "ROLE: REFERENCE_CLASSIFIER\nInspect the next stage." });
+    assert.deepEqual(first.value, value); assert.deepEqual(nextStage.value, value);
+    assert.deepEqual(requests, ["google/gemma-cooldown-test:free", "nvidia/nemotron-fallback-test:free", "nvidia/nemotron-fallback-test:free"]);
+  } finally {
+    globalThis.fetch = original;
+    if (key === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = key;
+    if (retries === undefined) delete process.env.MAX_MODEL_RETRIES; else process.env.MAX_MODEL_RETRIES = retries;
+    if (preferred === undefined) delete process.env.MODEL_PREFERRED_FAMILIES; else process.env.MODEL_PREFERRED_FAMILIES = preferred;
+  }
 });
 
 test("schema failure has one bounded format retry; authentication failure is not retried", async () => {

@@ -1,11 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { mkdirSync, existsSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import type { Evaluation, FilePlan, GeneratedProject, GenerationJob, JobEvent, Revision, StoredAsset, VisualSpec } from "@/lib/domain";
 import { jobContext } from "./job-context";
 import sharp from "sharp";
+import { deleteOperationalTraces } from "./telemetry";
 
 export type TaskInput = { kind: "generation" | "refinement"; ownerId: string; data: Record<string, unknown> };
 type Task = { jobId: string; input: TaskInput; lease?: string; leaseUntil?: number; attempts: number; checkpoints: Record<string, unknown>; deadline: number };
@@ -21,6 +22,10 @@ type Database = {
 };
 
 const emptyDatabase = (): Database => ({ assets: [], jobs: [], revisions: [], specs: [], projectOwners: {}, tasks: [], requests: {} });
+
+export class ActiveProjectJobError extends Error {
+  constructor() { super("This project has an active job. Cancel it or wait for it to finish before deleting the project."); }
+}
 
 export class LocalProjectStore {
   // This is intentionally configurable to a private, deployment-managed volume.
@@ -256,6 +261,50 @@ export class LocalProjectStore {
     const latestJob = database.jobs.filter(j => j.projectId === projectId).at(-1);
     const relevantJob = latestJob && (!latestAsset || latestJob.createdAt >= latestAsset.createdAt) ? latestJob : undefined;
     return { projects, assets: database.assets.filter(a => a.projectId === projectId), selectedAssetId: latestAsset?.id, spec: database.specs.find(s => s.projectId === projectId)?.spec, job: relevantJob, revisions: database.revisions.filter(r => r.projectId === projectId && (!r.jobId || database.jobs.some(j => j.id === r.jobId && j.phase === "ready"))).reverse() };
+  }
+
+  async deleteProject(projectId: string, ownerId: string) {
+    if (!/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(projectId)) throw new Error("Invalid project identifier.");
+    const files = await this.mutate(database => {
+      const owner = database.projectOwners[projectId];
+      if (!owner) return undefined;
+      if (owner !== ownerId) throw new Error("Project access denied.");
+      const jobs = database.jobs.filter(job => job.projectId === projectId);
+      const jobIds = new Set(jobs.map(job => job.id));
+      if (jobs.some(job => !["ready", "failed", "cancelled"].includes(job.phase))) throw new ActiveProjectJobError();
+      const assets = database.assets.filter(asset => asset.projectId === projectId);
+      const revisions = database.revisions.filter(revision => revision.projectId === projectId);
+      const keys = [
+        ...assets.map(asset => `assets/${asset.id}`),
+        ...revisions.flatMap(revision => [`previews/${revision.id}.png`, `previews/${revision.id}.html`, `previews/${revision.id}.diff.png`]),
+        ...jobs.map(job => `candidates/${job.id}`),
+      ];
+      database.assets = database.assets.filter(asset => asset.projectId !== projectId);
+      database.jobs = database.jobs.filter(job => job.projectId !== projectId);
+      database.tasks = database.tasks.filter(task => !jobIds.has(task.jobId));
+      database.revisions = database.revisions.filter(revision => revision.projectId !== projectId);
+      database.specs = database.specs.filter(spec => spec.projectId !== projectId);
+      delete database.projectOwners[projectId];
+      const requestPrefix = ownerId + ":" + projectId + ":";
+      for (const key of Object.keys(database.requests)) if (key.startsWith(requestPrefix)) delete database.requests[key];
+      return keys;
+    });
+    if (!files) return { deleted: false, cleanupComplete: true };
+
+    // Identifiers above are generated UUIDs and these paths are fixed under the private root.
+    let cleanupComplete = true;
+    for (const key of [...files, "metadata.json"]) {
+      const target = path.resolve(this.root, key);
+      const relative = path.relative(this.root, target);
+      if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) { cleanupComplete = false; continue; }
+      try { await rm(target, { recursive: true, force: true }); } catch { cleanupComplete = false; }
+    }
+    const deletedJobIds = files.filter(key => key.startsWith("candidates/")).map(key => key.split("/")[1]);
+    if (!deleteOperationalTraces([...new Set(deletedJobIds)], [projectId], this.root)) cleanupComplete = false;
+    try {
+      this.db().exec("PRAGMA wal_checkpoint(TRUNCATE); VACUUM; PRAGMA wal_checkpoint(TRUNCATE);");
+    } catch { cleanupComplete = false; }
+    return { deleted: true, cleanupComplete };
   }
 
   async claim() {
