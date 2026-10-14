@@ -52,7 +52,7 @@ npm run build
 ## Not certified or silently marked complete
 
 - Arbitrary-website pixel-perfect reconstruction, dependable free-provider availability or production accuracy. The earlier six-attempt benchmark pilot was 0/6; retain that denominator. Small authored samples and studio acceptance are not independent visual proof.
-- The latest studio diagnostic ledger is 0/6 ready/exported across configurations. Its newest one-case run failed during generation after two HTTP 429 responses, one HTTP 502 response and a 90-second timeout; better audit visibility is not a reconstruction fix.
+- The latest studio diagnostic ledger is 0/7 ready/exported across configurations. The newest isolated one-case run, after routing/audit changes, succeeded through analysis and three blueprint calls but failed in code generation (two 90-second timeouts and two HTTP 429 responses); better audit visibility and routing cooldowns are not a reconstruction fix. The prior run's HTTP 502 is retained in its own record.
 - Region-level AI accuracy or component-level generalization. The original benchmark truth remains page-level and live VisualSpecs are model-produced. The separate 12-case region oracle uses the same authored DOM/source that generated its screenshots, so it validates the instrument rather than independent AI accuracy.
 - Nominal 90% forecast coverage. The measured historical run remains 72.6% and blocked; fixing promotion safety does not change its statistics. A new untouched labelled period is needed for a defensible model-improvement claim.
 - Broad document reasoning/retrieval quality. Sixteen authored lexical questions are a smoke test, not a representative semantic/LLM evaluation or proof against all prompt injection.

@@ -1,0 +1,46 @@
+{
+  "recordedAt": "2026-10-14",
+  "startedAt": "2026-10-14T18:51:26.685Z",
+  "kind": "local-live-studio-diagnostic-rerun",
+  "runId": "fc8e9390-91f5-4fff-9cf7-c7f6ed07dd6a",
+  "sourceCommit": "239893623ec14ccd9fd3199adacf06d379475c35",
+  "promptVersion": "studio-prompts@1.5.0",
+  "datasetHash": "d3b6d382405286977fa364a1a714b4a9cfc5af058e60743857d9677fa2db1979",
+  "caseIds": ["dashboard-desktop"],
+  "scope": "One authored development reference through the actual isolated upload, analysis, blueprint, generation, validation, review and export workflow. No holdout, oracle source or oracle truth was sent to inference.",
+  "environment": {
+    "sandbox": "Docker",
+    "rendererImageId": "sha256:6d75ddf166371adcaff3ce32044fef5cbb53d2664f498f420c24e982ff32cf5f",
+    "node": "v25.2.0"
+  },
+  "routing": {
+    "inferenceProvider": "OpenRouter only",
+    "pricePolicy": "provider.max_price prompt=0 completion=0",
+    "preferredFamilies": ["nemotron", "gemma"],
+    "maxRetries": 3,
+    "requestTimeoutMs": 90000
+  },
+  "outcome": {
+    "attempted": 1,
+    "ready": 0,
+    "exported": 0,
+    "failurePhase": "generation",
+    "elapsedMs": 255391,
+    "publishedRevision": false,
+    "error": "TimeoutError"
+  },
+  "providerObservations": [
+    { "stage": "visual-spec analysis", "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", "outcome": "success" },
+    { "stage": "blueprint", "model": "nvidia/nemotron-3-super-120b-a12b:free", "outcome": "success", "calls": 3 },
+    { "stage": "code generation", "attempt": 1, "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", "outcome": "TIMEOUT", "durationMs": 90012 },
+    { "stage": "code generation", "attempt": 2, "model": "google/gemma-4-26b-a4b-it:free", "outcome": "HTTP_429", "durationMs": 491 },
+    { "stage": "code generation", "attempt": 3, "model": "google/gemma-4-31b-it:free", "outcome": "HTTP_429", "durationMs": 284 },
+    { "stage": "code generation", "attempt": 4, "model": "dots-studio/dots-3-note-preview:free", "outcome": "TIMEOUT", "durationMs": 90008 }
+  ],
+  "limitations": [
+    "One authored development case is diagnostic evidence, not a quality estimate or arbitrary-site generalization claim.",
+    "A ready revision would indicate studio-gate acceptance, not independent visual accuracy; this run produced no revision or export.",
+    "Provider availability is dynamic. The zero-price-only policy constrains inference cost but does not guarantee availability or quality.",
+    "The rerun occurred after routing/attempt-audit changes but failed during code generation; it does not establish improved completion or fidelity."
+  ]
+}
