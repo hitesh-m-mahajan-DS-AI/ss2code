@@ -1,6 +1,6 @@
 # Reliability implementation checklist
 
-Updated 4 October 2026. README.md and prompts.md remain the authoritative target specifications. This checklist records local implementation, not a claim that every product aspiration is complete.
+Updated 14 October 2026. README.md and prompts.md remain the authoritative target specifications. This checklist records local implementation, not a claim that every product aspiration is complete.
 
 ## Completed implementation
 
@@ -24,6 +24,9 @@ Updated 4 October 2026. README.md and prompts.md remain the authoritative target
 - [x] Update local setup/security guidance and add dependency scanning to CI.
 - [x] Synchronize browser failure-recovery checks with completed project restoration and assert the actual restored failed job, while retaining a capture on future test failures.
 - [x] Load environment configuration before spawning the web/worker launcher; bind local launcher and test servers to loopback by default.
+- [x] Add signed per-region CSS-pixel edge deltas and material adjacent-region spacing diagnostics without lowering existing geometry/pixel/text thresholds.
+- [x] Measure browser-computed typography only through exact region IDs and explicit element markers; treat missing/ambiguous legacy mappings as unverified, and fail closed on high-confidence mapped title mismatches in critical regions.
+- [x] Add a real-browser regression proving that a high global pixel score can coexist with a blocking mapped typography mismatch.
 
 ## Release verification
 
@@ -44,6 +47,7 @@ npm run build
 ## Not certified or silently marked complete
 
 - Arbitrary-website pixel-perfect reconstruction, dependable free-provider availability or production accuracy. The earlier six-attempt benchmark pilot was 0/6; retain that denominator. Small authored samples and studio acceptance are not independent visual proof.
+- Region-level AI accuracy or component-level generalization. The new renderer can measure mapped styles and geometric relations, but the current benchmark's oracle truth remains page-level and the live VisualSpec is model-produced.
 - Nominal 90% forecast coverage. The measured historical run remains 72.6% and blocked; fixing promotion safety does not change its statistics. A new untouched labelled period is needed for a defensible model-improvement claim.
 - Broad document reasoning/retrieval quality. Sixteen authored lexical questions are a smoke test, not a representative semantic/LLM evaluation or proof against all prompt injection.
 - Full account recovery, automatic retention/deletion, PDF/design/ZIP ingestion, multi-reference/multi-state reconstruction, multi-tenant scaling and real-user accessibility evaluation. These remain product work; existing supported features are preserved.

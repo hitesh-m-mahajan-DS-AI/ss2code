@@ -6,7 +6,7 @@
   "overrides": { "braces": "$braces" },
   "scripts": {
     "dev": "node scripts/studio.mjs dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "node scripts/studio.mjs start",
     "worker": "tsx src/workers/jobs.ts",
     "doctor": "tsx scripts/doctor.ts",

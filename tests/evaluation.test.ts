@@ -10,9 +10,13 @@ test("benchmark split validation rejects template leakage", () => {
 });
 
 test("benchmark reports retain failures and separate missing measurements", () => {
-  const row: BenchmarkResult = { id: "a", group: "a", category: "dashboard", lane: "direct", repeat: 0, traceId: "a", completed: true, firstBuildPassed: true, durationMs: 100, modelIds: [], repairPasses: 0, pixelAgreement: .8 };
-  const summary = summarize([row, { ...row, id: "b", group: "b", completed: false, firstBuildPassed: false, pixelAgreement: undefined, failureCategory: "generation" }]);
+  const row: BenchmarkResult = { id: "a", group: "a", category: "dashboard", lane: "direct", repeat: 0, traceId: "a", completed: true, firstBuildPassed: true, durationMs: 100, modelIds: [], repairPasses: 0, pixelAgreement: .8, regionEdgeMeanAbsPx: 2, regionEdgeMaxAbsPx: 6, spacingRelationsChecked: 4, spacingDeviationMeanAbsPx: 12, spacingDeviationCount: 1, verifiedTypographyChecks: 1, verifiedTypographyMismatches: 1, unverifiedTypographyChecks: 0 };
+  const summary = summarize([row, { ...row, id: "b", group: "b", completed: false, firstBuildPassed: false, pixelAgreement: undefined, regionEdgeMeanAbsPx: undefined, regionEdgeMaxAbsPx: undefined, spacingRelationsChecked: 0, spacingDeviationMeanAbsPx: undefined, spacingDeviationCount: 0, verifiedTypographyChecks: undefined, verifiedTypographyMismatches: undefined, unverifiedTypographyChecks: undefined, failureCategory: "generation" }]);
   assert.equal(summary.completionRate, .5); assert.deepEqual(summary.pixelAgreement, { value: .8, measured: 1, total: 2 });
+  assert.deepEqual(summary.regionEdgeMeanAbsPx, { value: 2, measured: 1, total: 2 });
+  assert.deepEqual(summary.spacingRelationsChecked, { value: 2, measured: 2, total: 2 });
+  assert.deepEqual(summary.spacingDeviationMeanAbsPx, { value: 12, measured: 1, total: 2 });
+  assert.deepEqual(summary.verifiedTypographyMismatches, { value: 1, measured: 1, total: 2 });
   assert.equal(summary.failures.generation, 1); assert.ok(summary.completion95Interval);
 });
 

@@ -119,6 +119,20 @@ for (const item of selected) for (let repeat = 0; repeat < repeats; repeat++) {
       const regions = best.metrics.regions ?? [];
       const avg = (values: (number | undefined)[]) => { const n = values.filter((v): v is number => v !== undefined); return n.length ? n.reduce((a, b) => a + b, 0) / n.length : undefined; };
       row.geometry = avg(regions.map(r => r.geometryScore)); row.textCoverage = avg(regions.map(r => r.textCoverage)); row.seriousA11y = best.a11yFindings.filter(f => ["critical", "serious"].includes(f.severity)).length;
+      const edgeErrors = regions.flatMap(region => region.edgeDeltasPx ? Object.values(region.edgeDeltasPx).map(Math.abs) : []);
+      if (edgeErrors.length) { row.regionEdgeMeanAbsPx = avg(edgeErrors)!; row.regionEdgeMaxAbsPx = Math.max(...edgeErrors); }
+      const spacingDeviations = best.metrics.layoutRelationships ?? [];
+      if (best.metrics.layoutRelationshipsChecked !== undefined) {
+        row.spacingRelationsChecked = best.metrics.layoutRelationshipsChecked;
+        row.spacingDeviationCount = spacingDeviations.length;
+      }
+      if (spacingDeviations.length) row.spacingDeviationMeanAbsPx = avg(spacingDeviations.map(item => Math.abs(item.deltaPx)))!;
+      const typographyChecks = best.metrics.typographyChecks ?? [];
+      if (typographyChecks.length) {
+        row.verifiedTypographyChecks = typographyChecks.filter(item => item.verified).length;
+        row.verifiedTypographyMismatches = typographyChecks.filter(item => item.verified && item.mismatches.length > 0).length;
+        row.unverifiedTypographyChecks = typographyChecks.filter(item => !item.verified).length;
+      }
       await writeFile(path.join(out, `${item.id}-${repeat}.png`), best.screenshot);
       await writeFile(path.join(out, `${item.id}-${repeat}.diff.png`), best.diff);
     } catch (error) { row.failureCategory = phase; row.failureMessage = safeError(error); }

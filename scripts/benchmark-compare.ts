@@ -22,6 +22,15 @@ console.log(JSON.stringify({
   runs: runs.map(({ metadata, rows }) => ({ runId: metadata.runId, lane: metadata.lane, ...summarize(rows), resolvedModels: [...new Set(rows.flatMap(row => row.modelIds))] })),
   pairedAgainstFirst: runs.slice(1).map(run => ({ lane: run.metadata.lane, differences: run.rows.map(row => {
     const baseline = first.rows.find(candidate => candidate.id === row.id && candidate.repeat === row.repeat)!;
-    return { id: row.id, repeat: row.repeat, completionDifference: Number(row.completed) - Number(baseline.completed), elapsedDifferenceMs: row.durationMs - baseline.durationMs, pixelDifference: row.pixelAgreement !== undefined && baseline.pixelAgreement !== undefined ? row.pixelAgreement - baseline.pixelAgreement : null };
+    return {
+      id: row.id,
+      repeat: row.repeat,
+      completionDifference: Number(row.completed) - Number(baseline.completed),
+      elapsedDifferenceMs: row.durationMs - baseline.durationMs,
+      pixelDifference: row.pixelAgreement !== undefined && baseline.pixelAgreement !== undefined ? row.pixelAgreement - baseline.pixelAgreement : null,
+      regionEdgeMeanAbsPxDifference: row.regionEdgeMeanAbsPx !== undefined && baseline.regionEdgeMeanAbsPx !== undefined ? row.regionEdgeMeanAbsPx - baseline.regionEdgeMeanAbsPx : null,
+      spacingDeviationMeanAbsPxDifference: row.spacingDeviationMeanAbsPx !== undefined && baseline.spacingDeviationMeanAbsPx !== undefined ? row.spacingDeviationMeanAbsPx - baseline.spacingDeviationMeanAbsPx : null,
+      verifiedTypographyMismatchDifference: row.verifiedTypographyMismatches !== undefined && baseline.verifiedTypographyMismatches !== undefined ? row.verifiedTypographyMismatches - baseline.verifiedTypographyMismatches : null,
+    };
   }) })),
 }, null, 2));

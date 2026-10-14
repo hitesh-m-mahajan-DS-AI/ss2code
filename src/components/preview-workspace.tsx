@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import type { ManifestFile, Revision } from "@/lib/domain";
 import { FileTree, BlueprintTree } from "./project-tree";
 
+const signedPixels = (value: number) => (value > 0 ? "+" : "") + value.toFixed(1) + "px";
+
 export function PreviewWorkspace({ revision, referenceUrl, onRefine, locked, onToggleLock }: { revision?: Revision; referenceUrl?: string; onRefine: (region: string) => void; locked: string[]; onToggleLock: (region: string) => void }) {
   const [mode, setMode] = useState("live");
   const [device, setDevice] = useState("reference");
@@ -68,10 +70,20 @@ export function PreviewWorkspace({ revision, referenceUrl, onRefine, locked, onT
     <p className="preview-note">Comparison uses the original reference viewport. Device presets show inferred reflow. Live preview cannot access your session or the network.</p>
     {error && <p className="inline-error" role="status">{error}</p>}
     {revision && <>
-      <section className="score-row"><div><small>Pixel agreement</small><strong>{Math.round((revision.evaluation.metrics.visualScore ?? 0) * 100)}%</strong></div><div><small>Build and browser</small><strong className="success-text">Passed</strong></div><div><small>Visual findings</small><strong>{revision.evaluation.visualFindings.length}</strong></div></section>
+      <section className="score-row"><div><small>Raw pixel agreement</small><strong>{Math.round((revision.evaluation.metrics.visualScore ?? 0) * 100)}%</strong></div><div><small>Build and browser</small><strong className="success-text">Passed</strong></div><div><small>Visual findings</small><strong>{revision.evaluation.visualFindings.length}</strong></div></section>
       <BlueprintTree tree={revision.componentTree} plan={revision.filePlan} onSelect={setRegion} />
       {region && <section className="inspector-card"><h3>Region: {region}</h3>{mapped.map(file => <button type="button" className="secondary-button" key={file.path} onClick={() => { setActive(file.path); setMode("code"); }}>{file.path}</button>)}<div><button type="button" className="secondary-button" aria-pressed={locked.includes(region)} onClick={() => onToggleLock(region)}>{locked.includes(region) ? "Unlock region" : "Lock region"}</button><button type="button" className="primary-button" onClick={() => onRefine(region)}>Refine this region</button></div></section>}
-      <details className="evaluation-details"><summary>Validation evidence and known gaps</summary><p>{revision.evaluation.metrics.checks?.join(" · ")}</p>{revision.evaluation.metrics.regions?.map(r => <p key={r.region}>{r.region}: pixels {Math.round(r.pixelScore * 100)}% · geometry {r.geometryScore === undefined ? "unmeasured" : Math.round(r.geometryScore * 100) + "%"} · text {r.textCoverage === undefined ? "unmeasured" : Math.round(r.textCoverage * 100) + "%"}</p>)}{revision.evaluation.visualFindings.map(f => <p key={f.id}><strong>{f.severity} · {f.region}</strong>: {f.observed} {f.suggestedDirection}</p>)}{revision.evaluation.a11yFindings.map(f => <p key={f.id}>{f.severity}: {f.message}</p>)}{revision.evaluation.metrics.limitations?.map(item => <p key={item}>{item}</p>)}</details>
+      <details className="evaluation-details"><summary>Validation evidence and known gaps</summary>
+        <p><strong>Pixel similarity is not an overall fidelity score.</strong> Geometry, spacing and text are shown separately where the confirmed spec supports those measurements.</p>
+        <p>{revision.evaluation.metrics.checks?.join(" · ")}</p>
+        {revision.evaluation.metrics.regions?.map(r => <p key={r.region}>{r.region}: pixels {Math.round(r.pixelScore * 100)}% · geometry {r.geometryScore === undefined ? "unmeasured" : Math.round(r.geometryScore * 100) + "%"} · text {r.textCoverage === undefined ? "unmeasured" : Math.round(r.textCoverage * 100) + "%"} · edges rendered − expected {r.edgeDeltasPx ? `L ${signedPixels(r.edgeDeltasPx.left)}, T ${signedPixels(r.edgeDeltasPx.top)}, R ${signedPixels(r.edgeDeltasPx.right)}, B ${signedPixels(r.edgeDeltasPx.bottom)}` : "unmeasured"}</p>)}
+        {revision.evaluation.metrics.layoutRelationshipsChecked !== undefined && <p>Adjacent region pairs checked: {revision.evaluation.metrics.layoutRelationshipsChecked}; material spacing deviations: {revision.evaluation.metrics.layoutRelationships?.length ?? 0}.</p>}
+        {revision.evaluation.metrics.layoutRelationships?.map((r, index) => <p key={`${r.firstRegion}-${r.secondRegion}-${index}`}>Spacing {r.firstRegion} → {r.secondRegion} ({r.axis}): expected {r.expectedGapPx}px, rendered {r.actualGapPx}px, delta {signedPixels(r.deltaPx)}.</p>)}
+        {revision.evaluation.metrics.typographyChecks?.map((check, index) => <p key={`${check.role}-${check.regionId ?? "unmapped"}-${index}`}>Typography {check.role}{check.regionId ? ` · ${check.regionId}` : " · no region mapping"} · {check.confidence ? `${check.confidence} confidence` : "confidence unrecorded"} · {check.status === "measured" ? `expected ${check.expected.fontSizePx}px / ${check.expected.weight}, rendered ${check.actual?.fontSizePx ?? "?"}px / ${check.actual?.weight ?? "?"}` : check.status === "ambiguous" ? "ambiguous target; not scored" : "no target; not scored"}{check.mismatches.length ? ` · ${check.mismatches.join("; ")}` : ""}{!check.verified ? " · unverified" : ""}</p>)}
+        {revision.evaluation.visualFindings.map(f => <p key={f.id}><strong>{f.severity} · {f.region}</strong>: {f.observed} {f.suggestedDirection}</p>)}
+        {revision.evaluation.a11yFindings.map(f => <p key={f.id}>{f.severity}: {f.message}</p>)}
+        {revision.evaluation.metrics.limitations?.map(item => <p key={item}>{item}</p>)}
+      </details>
     </>}
   </>;
 }

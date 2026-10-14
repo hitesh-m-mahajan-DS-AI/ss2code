@@ -18,7 +18,7 @@ Local text corpus → hashed lexical index → retrieved passages → verified q
 ## Boundaries
 
 - Studio remains Next.js + React + a separate durable worker on one host. SQLite and assets are private runtime data. Anonymous signed-cookie ownership is not a full account system.
-- The screenshot harness calls shared prompt contracts, the existing renderer and manifest policy. Its three lanes are controlled ablations, **not an exact replay of every production reviewer/final-QA stage**. The deterministic gates cannot be overridden by an LLM.
+- The screenshot harness calls shared prompt contracts, the existing renderer and manifest policy. Its three lanes are controlled ablations, **not an exact replay of every production reviewer/final-QA stage**. The deterministic gates cannot be overridden by an LLM. Region edge/gap/typography metrics compare to the approved VisualSpec; unless separately supplied as oracle truth, they are not independent AI accuracy measurements. Legacy or ambiguous typography mappings stay unverified.
 - `traceContext` carries a private trace ID; job context is used when no explicit evaluation trace exists. Telemetry uses allowlisted numbers/labels, never request bodies. Telemetry failure does not fail generation. This is local operational instrumentation, not a hosted tracing service.
 - Analytics is an administrator CLI, not a cross-user HTTP endpoint. IDs are salted per report; raw workspace IDs, owners, images, filenames, generated source and prompts are not warehouse columns. Aggregates still deserve access control.
 - Forecasting is a separately installable Python command-line project. It does not call an LLM. A batch model does not need to masquerade as a real-time service.

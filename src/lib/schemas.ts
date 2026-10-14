@@ -16,7 +16,17 @@ export const visualSpecSchema = z.object({
     hierarchy: z.array(z.string().max(240)).max(30),
     style: z.object({
       palette: z.array(z.object({ role: z.string().max(80), value: z.string().max(60), confidence })).max(20),
-      typography: z.array(z.object({ role: z.string().max(80), sizePxApprox: z.number().positive().max(400), weight: z.string().max(40), notes: z.string().max(300) })).max(20),
+      typography: z.array(z.object({
+        role: z.string().min(1).max(80),
+        sizePxApprox: z.number().positive().max(400),
+        weight: z.string().max(40),
+        notes: z.string().max(300),
+        regionId: z.string().min(1).max(80).optional(),
+        confidence: confidence.optional(),
+        family: z.string().max(100).optional(),
+        lineHeightPxApprox: z.number().positive().max(600).optional(),
+        letterSpacingPxApprox: z.number().min(-20).max(100).optional(),
+      }).strict()).max(20),
       spacing: z.object({ basePxApprox: z.number().positive().max(100), notes: z.string().max(300) }),
       radii: z.string().max(300),
       bordersAndShadows: z.string().max(500),
@@ -34,6 +44,10 @@ export const visualSpecSchema = z.object({
   value.observations.layout.forEach((region, index) => {
     if (seen.has(region.id)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["observations", "layout", index, "id"], message: "Visual region IDs must be unique." });
     seen.add(region.id);
+  });
+  const regionIds = new Set(value.observations.layout.map(region => region.id));
+  value.observations.style.typography.forEach((style, index) => {
+    if (style.regionId && !regionIds.has(style.regionId)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["observations", "style", "typography", index, "regionId"], message: "Typography regionId must reference an observed layout ID." });
   });
 });
 

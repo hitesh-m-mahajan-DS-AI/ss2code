@@ -44,7 +44,7 @@ export type VisualSpec = {
     hierarchy: string[];
     style: {
       palette: Array<{ role: string; value: string; confidence: "high" | "medium" | "low" }>;
-      typography: Array<{ role: string; sizePxApprox: number; weight: string; notes: string }>;
+      typography: Array<{ role: string; sizePxApprox: number; weight: string; notes: string; regionId?: string; confidence?: "high" | "medium" | "low"; family?: string; lineHeightPxApprox?: number; letterSpacingPxApprox?: number }>;
       spacing: { basePxApprox: number; notes: string };
       radii: string;
       bordersAndShadows: string;
@@ -86,7 +86,18 @@ export type Evaluation = {
   buildFindings: Array<{ id: string; file?: string; category: "parse" | "type" | "lint" | "build" | "runtime"; message: string }>;
   visualFindings: Array<{ id: string; severity: "critical" | "high" | "medium" | "low"; region: string; expected: string; observed: string; suggestedDirection: string }>;
   a11yFindings: Array<{ id: string; severity: string; message: string; target?: string }>;
-  metrics: { visualScore?: number; previousVisualScore?: number; horizontalOverflow: boolean; regions?: Array<{ region: string; pixelScore: number; geometryScore?: number; textCoverage?: number }>; viewport?: { width: number; height: number }; limitations?: string[]; checks?: string[] };
+  metrics: {
+    visualScore?: number;
+    previousVisualScore?: number;
+    horizontalOverflow: boolean;
+    regions?: Array<{ region: string; pixelScore: number; geometryScore?: number; textCoverage?: number; edgeDeltasPx?: { left: number; top: number; right: number; bottom: number } }>;
+    layoutRelationships?: Array<{ firstRegion: string; secondRegion: string; axis: "horizontal" | "vertical"; expectedGapPx: number; actualGapPx: number; deltaPx: number }>;
+    layoutRelationshipsChecked?: number;
+    typographyChecks?: Array<{ role: string; regionId?: string; confidence?: "high" | "medium" | "low"; status: "measured" | "missing" | "ambiguous"; verified: boolean; expected: { fontSizePx: number; weight: string; family?: string; lineHeightPx?: number; letterSpacingPx?: number }; actual?: { fontSizePx?: number; weight?: string; family?: string; lineHeightPx?: number; letterSpacingPx?: number }; mismatches: string[] }>;
+    viewport?: { width: number; height: number };
+    limitations?: string[];
+    checks?: string[];
+  };
 };
 
 export type JobEvent = { sequence: number; type: string; level: "info" | "success" | "warning" | "error"; safeMessage: string; createdAt: string };

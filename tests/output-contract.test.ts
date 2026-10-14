@@ -13,6 +13,8 @@ test("region coordinates are finite in-viewport xywh with positive size and uniq
   assert.ok(visualSpecSchema.safeParse(fixtureSpec).success);
   assert.equal(visualSpecSchema.safeParse({ ...fixtureSpec, observations: { ...fixtureSpec.observations, layout: [] } }).success, false);
   assert.equal(visualSpecSchema.safeParse({ ...fixtureSpec, observations: { ...fixtureSpec.observations, layout: [fixtureSpec.observations.layout[0], fixtureSpec.observations.layout[0]] } }).success, false);
+  assert.ok(visualSpecSchema.safeParse({ ...fixtureSpec, observations: { ...fixtureSpec.observations, style: { ...fixtureSpec.observations.style, typography: [{ role: "heading", sizePxApprox: 32, weight: "700", notes: "Title", regionId: "page", confidence: "high", family: "Arial" }] } } }).success);
+  assert.equal(visualSpecSchema.safeParse({ ...fixtureSpec, observations: { ...fixtureSpec.observations, style: { ...fixtureSpec.observations.style, typography: [{ role: "heading", sizePxApprox: 32, weight: "700", notes: "Title", regionId: "unknown", confidence: "high" }] } } }).success, false);
   assert.match(JSON.stringify(zodToJsonSchema(percentBoundsSchema)), /NOT/);
 });
 

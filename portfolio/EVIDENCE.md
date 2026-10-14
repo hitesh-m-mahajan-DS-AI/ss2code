@@ -103,6 +103,18 @@ The final one-reference diagnostic was declared in advance with **zero optional 
 
 The application is a locally verified engineering prototype, **not a perfectly accurate arbitrary-website converter**. Free-provider congestion/schema failures, model-written source defects, tiny evaluations and absent independent human validation remain material. Local hashes/artifacts provide traceability, not a signed tamper-proof audit record. Public deployment and an off-host restore drill remain unverified by user choice.
 
+## 14 October 2026 region-level fidelity pass
+
+Before editing, the local `main` worktree was clean at `cf8c132`, matched `origin/main`, and the latest recorded CI run (`37169127559`) had passed. This baseline is not a CI result for the changes below.
+
+The renderer now preserves the prior pixel/text/aggregate geometry checks and additionally records signed CSS-pixel deltas for each uniquely mapped region edge, material gaps between adjacent mapped regions, and computed font size/weight/family/line-height/letter-spacing where those values were approved and measurable. New P02 observations may carry an exact `regionId`, confidence and optional typography details; these remain optional so older stored VisualSpecs parse without invented confidence. Generation is instructed to mark the actual text element. Ambiguous or missing targets are reported as unverified. A high-confidence heading mismatch in a critical region becomes a critical finding and therefore cannot pass the existing fail-closed publication gate. Prompt fingerprint version is now 1.5.0.
+
+A real-Chrome authored regression kept global pixel agreement above 98% while changing the title from the approved 32px/700 to 28px/400. The renderer measured the font-size and weight differences and emitted a critical finding. A first unmarked test correctly produced an ambiguous target when the region contained multiple headings; the test now marks the intended element explicitly. This validates measurement/gate behavior only—not AI accuracy or P02's ability to produce correct mappings. Current authored oracle truth remains page-level, so component-level scoring still lacks independent ground truth.
+
+Local verification: 36 Node tests passed, including the worker renderer integration and real-Chrome regression; TypeScript and ESLint passed; `next build --webpack` completed successfully. The default Next.js 16.3.7 Turbopack build reproducibly panicked while starting its CSS worker, so the documented `--webpack` option is now the project build script. No live OpenRouter reconstruction, holdout evaluation, human review, deployment or external backup drill was performed in this pass. The live 0/5 ready/exported diagnostic record remains unchanged.
+
+A fresh one-case development **oracle infrastructure self-test** also completed 1/1. It reported 99.60% raw pixel agreement and zero page-region edge error; spacing pairs checked were 0 and typography checks were absent because this fixture's truth is only one page region. This validates metric plumbing, not AI reconstruction, component spacing, or model accuracy.
+
 ## Defensible CV wording
 
 “Built a screenshot-to-code evaluation and observability system with capability-aware free-model routing, deterministic build/accessibility gates, private SQL analytics and failure-inclusive experiment reports.”

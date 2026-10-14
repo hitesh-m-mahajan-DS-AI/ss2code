@@ -21,6 +21,13 @@ test("real worker builds CSS/TS, measures fidelity, detects type errors and prod
     const frame = page.frameLocator("iframe");
     await frame.getByRole("button", { name: "Interactions: 0" }).click();
     assert.equal(await frame.getByRole("button").innerText(), "Interactions: 1");
+    const typographySpec = { ...fixtureSpec, observations: { ...fixtureSpec.observations, style: { ...fixtureSpec.observations.style, typography: [{ role: "heading", sizePxApprox: 32, weight: "700", notes: "Page title", regionId: "page", confidence: "high" as const }] } } };
+    const typographyFiles = fixtureFiles.map(file => file.path === "src/Header.tsx" ? { ...file, content: file.content.replace("<h1>", '<h1 data-ss2-typography="heading">') } : file.path.endsWith(".css") ? { ...file, content: file.content.replace("font-size:32px;line-height:1.2;font-weight:700", "font-size:28px;line-height:1.2;font-weight:400") } : file);
+    const typographyResult = await renderAndCompare({ ...input, files: typographyFiles, visualSpec: typographySpec });
+    assert.ok(typographyResult.visualScore > 0.98, "Small text differences should be capable of retaining a misleadingly high global pixel score");
+    assert.equal(typographyResult.metrics.typographyChecks?.[0].status, "measured");
+    assert.deepEqual(typographyResult.metrics.typographyChecks?.[0].mismatches, ["font size expected 32px, rendered 28px (-4px)", "font weight expected 700, rendered 400"]);
+    assert.ok(typographyResult.visualFindings.some(f => f.id === "typography-heading-page" && f.severity === "critical"));
     if (process.env.SANDBOX_MODE === "docker") {
       const nextResult = await renderAndCompare({ ...input, framework: "nextjs-tailwind" });
       assert.ok(nextResult.visualScore > 0.97, "Next.js export must build and retain reference fidelity");

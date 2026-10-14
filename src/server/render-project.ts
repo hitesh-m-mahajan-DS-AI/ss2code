@@ -8,9 +8,11 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Evaluation, FilePlan, ManifestFile, VisualSpec } from "@/lib/domain";
 import { scaffoldProject } from "./scaffold";
 import { compareImages } from "./visual-comparison";
+import { compareTypography, edgeDeltasPx, edgeTolerancePx, hasEdgeMismatch, measureLayoutRelationships, typographySelectorForRole, type TypographyObservation } from "./fidelity-metrics";
 
 export type RenderInput = { files: ManifestFile[]; plan: FilePlan; referenceDataUrl: string; viewport: { width: number; height: number }; visualSpec?: VisualSpec; framework?: "react-tailwind" | "nextjs-tailwind" };
 export type RenderResult = { screenshot: string; diff: string; html: string; visualScore: number; visualFindings: Evaluation["visualFindings"]; a11yFindings: Evaluation["a11yFindings"]; metrics: Evaluation["metrics"] };
+const signed = (value: number) => (value > 0 ? "+" : "") + value;
 
 async function command(args: string[], cwd: string) {
   return new Promise<void>((resolve, reject) => {
@@ -86,28 +88,112 @@ export async function renderProject(input: RenderInput): Promise<RenderResult> {
     const accessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
     const a11yFindings = accessibility.violations.map(item => ({ id: item.id + "-" + input.viewport.width, severity: item.impact ?? "moderate", message: (item.help + ": " + (item.nodes[0]?.failureSummary ?? "")).slice(0, 600), target: item.nodes.map(n => n.target.join(" ")).join(", ").slice(0, 200) }));
     const visualFindings: Evaluation["visualFindings"] = [];
-    const evidence = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>("[data-ss2-region]")].map(node => {
-      const rect = node.getBoundingClientRect();
-      return { id: node.dataset.ss2Region!, text: (node.innerText ?? "").replace(/\s+/g, " ").trim(), bounds: [rect.x / innerWidth * 100, rect.y / innerHeight * 100, rect.width / innerWidth * 100, rect.height / innerHeight * 100] };
-    }));
+    const typographyRequests = (input.visualSpec?.observations.style.typography ?? []).map(item => ({ ...item, selector: typographySelectorForRole(item.role) }));
+    const evidence = await page.evaluate(requests => {
+      const regionNodes = [...document.querySelectorAll<HTMLElement>("[data-ss2-region]")];
+      const regions = [];
+      for (const node of regionNodes) {
+        const rect = node.getBoundingClientRect();
+        regions.push({
+          id: node.dataset.ss2Region!,
+          text: (node.innerText ?? "").replace(/\s+/g, " ").trim(),
+          boundsPct: [rect.x / innerWidth * 100, rect.y / innerHeight * 100, rect.width / innerWidth * 100, rect.height / innerHeight * 100],
+          boundsPx: [rect.x, rect.y, rect.width, rect.height] as [number, number, number, number],
+        });
+      }
+      const typography = [];
+      for (const request of requests) {
+        const roots = [];
+        for (const node of regionNodes) if (!request.regionId || node.dataset.ss2Region === request.regionId) roots.push(node);
+        const targets = new Set<HTMLElement>();
+        for (const root of roots) {
+          const elements = [root, ...root.querySelectorAll<HTMLElement>("*")];
+          const marked = [];
+          for (const element of elements) if (element.dataset.ss2Typography?.trim().toLowerCase() === request.role.trim().toLowerCase()) marked.push(element);
+          if (marked.length) {
+            for (const element of marked) targets.add(element);
+          } else if (request.selector) {
+            for (const element of elements) if (element.matches(request.selector)) targets.add(element);
+          }
+        }
+        if (targets.size !== 1) {
+          typography.push({ status: targets.size ? "ambiguous" : "missing" });
+          continue;
+        }
+        const target = [...targets][0];
+        const actualRegionId = target.closest<HTMLElement>("[data-ss2-region]")?.dataset.ss2Region;
+        if (request.regionId && actualRegionId !== request.regionId) {
+          typography.push({ status: "ambiguous", regionId: actualRegionId });
+          continue;
+        }
+        const style = getComputedStyle(target);
+        const fontSizePx = Number.parseFloat(style.fontSize);
+        const lineHeightPx = Number.parseFloat(style.lineHeight);
+        const letterSpacingPx = Number.parseFloat(style.letterSpacing);
+        typography.push({
+          status: "measured",
+          regionId: actualRegionId,
+          fontSizePx: Number.isFinite(fontSizePx) ? fontSizePx : undefined,
+          weight: style.fontWeight,
+          family: style.fontFamily,
+          lineHeightPx: Number.isFinite(lineHeightPx) ? lineHeightPx : undefined,
+          letterSpacingPx: Number.isFinite(letterSpacingPx) ? letterSpacingPx : undefined,
+        });
+      }
+      return { regions, typography };
+    }, typographyRequests) as {
+      regions: Array<{ id: string; text: string; boundsPct: [number, number, number, number]; boundsPx: [number, number, number, number] }>;
+      typography: TypographyObservation[];
+    };
     const referencePage = await context.newPage();
     await referencePage.setContent('<style>html,body{margin:0;background:white}img{display:block}</style><img alt="" src="' + input.referenceDataUrl + '">');
     const dimensions = await referencePage.locator("img").evaluate(async node => { const img = node as HTMLImageElement; await img.decode(); return { width: img.naturalWidth, height: img.naturalHeight }; });
     if (dimensions.width !== input.viewport.width || dimensions.height !== input.viewport.height) throw new Error("Target viewport must match the reference's original dimensions. Reanalyse the reference; images are never stretched for scoring.");
     const reference = await stableScreenshot(referencePage);
-    const compared = compareImages(reference, screenshot, input.visualSpec?.observations.layout);
+    const layout = input.visualSpec?.observations.layout ?? [];
+    const compared = compareImages(reference, screenshot, layout);
+    const evidenceById = new Map<string, typeof evidence.regions>();
+    for (const node of evidence.regions) evidenceById.set(node.id, [...(evidenceById.get(node.id) ?? []), node]);
+    const typographyChecks = compareTypography(input.visualSpec?.observations.style.typography ?? [], evidence.typography);
     const regions = compared.regions.map(region => {
-      const observed = input.visualSpec!.observations.layout.find(r => r.id === region.region)!;
-      const node = evidence.find(n => n.id === region.region);
-      const visibleText = input.visualSpec!.observations.visibleText.filter(t => (t.region === observed.id || t.region === observed.region) && t.confidence === "high" && !t.text.includes("["));
-      const geometryScore = node ? Math.max(0, 1 - observed.boundsPct.reduce((sum, value, i) => sum + Math.abs(value - node.bounds[i]), 0) / 100) : 0;
+      const observed = layout.find(r => r.id === region.region)!;
+      const matches = evidenceById.get(region.region) ?? [];
+      const node = matches.length === 1 ? matches[0] : undefined;
+      const visibleText = (input.visualSpec?.observations.visibleText ?? []).filter(t => (t.region === observed.id || t.region === observed.region) && t.confidence === "high" && !t.text.includes("["));
+      const geometryScore = node ? Math.max(0, 1 - observed.boundsPct.reduce((sum, value, i) => sum + Math.abs(value - node.boundsPct[i]), 0) / 100) : 0;
       const textCoverage = visibleText.length ? visibleText.filter(t => node?.text.includes(t.text.replace(/\s+/g, " ").trim())).length / visibleText.length : undefined;
-      if (!node || geometryScore < 0.85 || region.pixelScore < 0.7 || (textCoverage !== undefined && textCoverage < 1)) {
-        const critical = observed.importance === "critical" && (!node || geometryScore < 0.85 || region.pixelScore < 0.7 || (textCoverage !== undefined && textCoverage < 1));
-        visualFindings.push({ id: "region-" + region.region, severity: critical ? "critical" : "high", region: observed.region, expected: "Match observed bounds " + observed.boundsPct.join(", ") + " and legible text.", observed: node ? "Pixel agreement " + Math.round(region.pixelScore * 100) + "%; geometry " + Math.round(geometryScore * 100) + "%; text coverage " + (textCoverage === undefined ? "not measured" : Math.round(textCoverage * 100) + "%") : "No element maps to this observed region.", suggestedDirection: "Correct only this region's geometry, visible text and styling; preserve matched regions." });
+      const edges = node ? edgeDeltasPx(observed.boundsPct, node.boundsPx, input.viewport) : undefined;
+      const edgeMismatch = hasEdgeMismatch(edges, input.viewport);
+      if (!node || geometryScore < 0.85 || edgeMismatch || region.pixelScore < 0.7 || (textCoverage !== undefined && textCoverage < 1)) {
+        const critical = observed.importance === "critical" && (!node || geometryScore < 0.85 || edgeMismatch || region.pixelScore < 0.7 || (textCoverage !== undefined && textCoverage < 1));
+        const edgeText = edges ? "; rendered − expected edges L " + signed(edges.left) + "px, T " + signed(edges.top) + "px, R " + signed(edges.right) + "px, B " + signed(edges.bottom) + "px" : "";
+        const mappingText = matches.length ? "Multiple elements map to this region (" + matches.length + "); exactly one is required." : "No element maps to this observed region.";
+        visualFindings.push({ id: "region-" + region.region, severity: critical ? "critical" : "high", region: observed.region, expected: "Match the observed [x, y, width, height] bounds " + observed.boundsPct.join(", ") + "% within " + Math.round(edgeTolerancePx(input.viewport)) + "px edge tolerance and preserve legible text.", observed: node ? "Pixel agreement " + Math.round(region.pixelScore * 100) + "%; geometry " + Math.round(geometryScore * 100) + "%; text coverage " + (textCoverage === undefined ? "not measured" : Math.round(textCoverage * 100) + "%") + edgeText : mappingText, suggestedDirection: "Use the signed edge offsets to correct this region's position and size; then correct text/styling only where measured. Preserve matched regions." });
       }
-      return { ...region, geometryScore, textCoverage };
+      return { ...region, geometryScore, textCoverage, ...(edges ? { edgeDeltasPx: edges } : {}) };
     });
+    const actualBounds = new Map([...evidenceById].filter(([, nodes]) => nodes.length === 1).map(([id, nodes]) => [id, nodes[0].boundsPx]));
+    const spacingMeasurements = measureLayoutRelationships(layout, actualBounds, input.viewport);
+    const layoutRelationships = spacingMeasurements.deviations;
+    for (const relation of layoutRelationships) {
+      const first = layout.find(item => item.id === relation.firstRegion);
+      const second = layout.find(item => item.id === relation.secondRegion);
+      const important = first?.importance === "critical" || second?.importance === "critical";
+      visualFindings.push({
+        id: "spacing-" + relation.axis + "-" + relation.firstRegion + "-" + relation.secondRegion,
+        severity: important && Math.abs(relation.deltaPx) >= 24 ? "high" : "medium",
+        region: (first?.region ?? relation.firstRegion) + " ↔ " + (second?.region ?? relation.secondRegion),
+        expected: "Preserve the observed " + relation.axis + " gap of " + relation.expectedGapPx + "px.",
+        observed: "Rendered gap " + relation.actualGapPx + "px (rendered − expected " + signed(relation.deltaPx) + "px).",
+        suggestedDirection: "Adjust the gap between these regions locally; preserve their measured outer bounds and all matched regions.",
+      });
+    }
+    for (const check of typographyChecks) {
+      if (!check.mismatches.length || !check.verified) continue;
+      const targetRegion = layout.find(region => region.id === check.regionId);
+      const criticalHeading = targetRegion?.importance === "critical" && /^(?:(?:page )?(?:title|heading)(?: [1-6])?)$/i.test(check.role.trim());
+      visualFindings.push({ id: "typography-" + check.role + "-" + check.regionId, severity: criticalHeading ? "critical" : "high", region: check.role + " · " + check.regionId, expected: "Match the high-confidence approved typography observations for this exact region.", observed: check.mismatches.join("; "), suggestedDirection: "Correct only the mapped text element's measured typography properties; keep its wording, line wrapping intent and surrounding geometry intact." });
+    }
     let horizontalOverflow = false;
     for (const width of [...new Set([input.viewport.width, 768, 360])]) {
       await page.setViewportSize({ width, height: input.viewport.height });
@@ -122,7 +208,7 @@ export async function renderProject(input: RenderInput): Promise<RenderResult> {
       }
     }
     if (runtimeErrors.length) throw new Error("Responsive runtime failure: " + runtimeErrors.join("; "));
-    const metrics: Evaluation["metrics"] = { visualScore: compared.score, horizontalOverflow, regions, viewport: input.viewport, checks: ["TypeScript", "ESLint", "production bundle", "stable render", "runtime errors", "360/768/reference axe accessibility", "360/768/reference overflow"], limitations: ["Pixel agreement is not a guarantee of fidelity.", "Geometry and text checks use the confirmed visual specification; unseen states are not verified.", "Interactions require human review in the live preview."] };
+    const metrics: Evaluation["metrics"] = { visualScore: compared.score, horizontalOverflow, regions, layoutRelationships, layoutRelationshipsChecked: spacingMeasurements.checkedPairs, typographyChecks, viewport: input.viewport, checks: ["TypeScript", "ESLint", "production bundle", "stable render", "runtime errors", "per-region edge geometry", "adjacent-region spacing", "mapped typography measurements", "360/768/reference axe accessibility", "360/768/reference overflow"], limitations: ["Raw pixel agreement is not a fidelity score and can stay high when small text/layout regions are wrong.", "Typography mismatches are actionable only when the approved observation is high-confidence and tied to an exact layout region; missing or ambiguous mappings are shown as unverified.", "Geometry and text checks use the confirmed visual specification; unseen states are not verified.", "Interactions require human review in the live preview."] };
     return { screenshot: screenshot.toString("base64"), diff: compared.diff.toString("base64"), html, visualScore: compared.score, visualFindings, a11yFindings, metrics };
   } finally {
     await browser?.close();
