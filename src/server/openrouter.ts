@@ -8,7 +8,7 @@ import { jobContext } from "./job-context";
 import { store, type LocalProjectStore } from "./repository";
 import { recordSpan, type Usage } from "./telemetry";
 import { documentEvidenceSchema } from "../lib/document-schema";
-import { scopedOutputContract, formatDiagnostics, contractFingerprint } from "./output-contract";
+import { scopedOutputContract, formatDiagnostics, schemaFailureCode, contractFingerprint } from "./output-contract";
 import { PROMPT_VERSION } from "@/lib/prompts";
 
 export type CatalogModel = { id: string; context_length?: number; architecture?: { input_modalities?: string[]; output_modalities?: string[] }; supported_parameters?: string[]; pricing?: Record<string, string | undefined>; reasoning?: { supported_efforts?: string[] | null; supports_max_tokens?: boolean; mandatory?: boolean } };
@@ -75,6 +75,31 @@ class ProviderError extends Error {
   constructor(readonly status: number, readonly retryAfter = 0) { super("OpenRouter could not serve this request (" + status + ")."); }
 }
 
+class CompletionTruncatedError extends Error {
+  constructor() { super("The model response was truncated before the required structured result was complete."); }
+}
+
+function truncationFailureMessage(contractRole: string) {
+  const stage = ({
+    REFERENCE_CLASSIFIER: "reference inspection",
+    VISUAL_SPEC: "visual analysis",
+    DESIGN_TOKEN_NORMALIZER: "design token planning",
+    COMPONENT_HIERARCHY: "component planning",
+    FILE_PLAN: "file planning",
+    GENERATE: "code generation",
+    STATIC_REVIEW: "code review",
+    A11Y_REVIEW: "accessibility review",
+    VISUAL_FIDELITY_REVIEW: "visual review",
+    REPAIR_PLANNER: "repair planning",
+    REPAIR_BUILD: "build repair",
+    REPAIR_VISUAL: "visual repair",
+    REFINEMENT_INTERPRETER: "refinement planning",
+    USER_REFINEMENT: "refinement",
+    FINAL_QA: "final review",
+  } as Record<string, string>)[contractRole] ?? "the current workflow stage";
+  return `No eligible free model completed ${stage}; the required structured output was truncated or unavailable. No partial result was accepted. Retry later or shorten the implementation brief.`;
+}
+
 type Completion = { model?: string; usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number }; error?: { code?: number }; choices?: Array<{ delta?: { content?: string }; message?: { content?: string }; finish_reason?: string }> };
 
 export function modelAuditAttempt(input: { role: ModelRole; requestedModelId?: string }, candidate: ModelCandidate, details: { durationMs: number; attempt: number; outcome: "ok" | "error" | "schema_error"; errorCode?: string; resolvedModelId?: string }): ModelAudit {
@@ -112,7 +137,7 @@ export async function readCompletion(response: Response, streaming: boolean) {
     if (item.error) throw new ProviderError(Number(item.error.code) || 502);
     modelId = item.model ?? modelId;
     if (item.usage) usage = { promptTokens: item.usage.prompt_tokens, completionTokens: item.usage.completion_tokens, totalTokens: item.usage.total_tokens, costCredits: item.usage.cost };
-    if (item.choices?.[0]?.finish_reason === "length") throw new Error("Model output exceeded the completion budget. Reduce the file plan and retry.");
+    if (item.choices?.[0]?.finish_reason === "length") throw new CompletionTruncatedError();
     text += item.choices?.[0]?.delta?.content ?? item.choices?.[0]?.message?.content ?? "";
     if (text.length > 7_500_000) throw new Error("Model output exceeded the safe size limit.");
   };
@@ -212,7 +237,7 @@ export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prom
       let value: T;
       try { value = schema.parse(JSON.parse(completion.text)) as T; }
       catch (error) {
-        outcome = "schema_error"; errorCode = "SCHEMA_INVALID";
+        outcome = "schema_error"; errorCode = schemaFailureCode(error);
         schemaRejected = true;
         if (formatRetry) throw new Error("Model response failed its schema after one format retry.");
         formatIssues = formatDiagnostics(error);
@@ -230,9 +255,23 @@ export async function structuredOpenRouterCall<T>(input: { role: ModelRole; prom
     } catch (error) {
       attemptDuration = performance.now() - attemptStart;
       if (error instanceof ProviderError) errorCode = "HTTP_" + error.status;
+      else if (error instanceof CompletionTruncatedError) errorCode = "OUTPUT_TRUNCATED";
       else if (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name)) errorCode = error.name === "TimeoutError" ? "TIMEOUT" : "ABORTED";
       if (signal?.aborted) throw new Error("JOB_CANCELLED");
       lastError = error;
+      // A truncated structured result cannot be safely repaired by repeating the
+      // same route with the same token cap. Cool it briefly and fail over to a
+      // different currently eligible zero-price route instead.
+      if (error instanceof CompletionTruncatedError) {
+        const hasNextNamedRoute = candidates.some(model => !attempted.has(model.id));
+        const hasFreeRouterRoute = !!freeRouterFallback && !attempted.has(freeRouterFallback.id);
+        if (!hasNextNamedRoute && !hasFreeRouterRoute) throw new Error(truncationFailureMessage(contractRole));
+        const failures = (health.get(candidate.id)?.failures ?? 0) + 1;
+        health.set(candidate.id, { failures, until: Date.now() + 60_000 });
+        const context = jobContext.getStore();
+        if (context) await store.appendEvent(context.jobId, { type: "model.retry", level: "warning", safeMessage: "A free model truncated the structured result. Trying another eligible free route; partial output was discarded." });
+        continue;
+      }
       // A route can advertise JSON mode yet repeatedly violate the local Zod
       // contract. Keep the single same-route format retry, then fail over rather
       // than letting one model's malformed output terminate the whole workflow.

@@ -225,6 +225,59 @@ test("a route that fails its one schema retry falls through to another verified-
   }
 });
 
+test("a truncated structured response fails over to a different verified-free route without repeating the request", async () => {
+  const original = globalThis.fetch, key = process.env.OPENROUTER_API_KEY, preferred = process.env.MODEL_PREFERRED_FAMILIES;
+  process.env.OPENROUTER_API_KEY = "test-only-not-a-real-key";
+  process.env.MODEL_PREFERRED_FAMILIES = "gemma,nemotron";
+  const routes: string[] = [];
+  const value = { kind: "image", readiness: "ready", likelyRole: "primary", nextAction: "Inspect", safeNotes: [] };
+  globalThis.fetch = (async (url, options) => {
+    if (String(url).endsWith("/models")) return Response.json({ data: [
+      "google/gemma-truncated-test:free",
+      "nvidia/nemotron-truncation-fallback:free",
+      "openrouter/free",
+    ].map(id => ({ id, pricing: { prompt: "0", completion: "0" }, context_length: 128_000, supported_parameters: ["response_format"], architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } })) });
+    const body = JSON.parse(String(options?.body)) as { model: string; provider: { max_price: unknown } };
+    assert.deepEqual(body.provider.max_price, { prompt: 0, completion: 0 });
+    routes.push(body.model);
+    if (routes.length === 1) return Response.json({ model: body.model, choices: [{ message: { content: "{\"kind\":\"image\"", }, finish_reason: "length" }] });
+    return Response.json({ model: body.model, choices: [{ message: { content: JSON.stringify(value) } }] });
+  }) as typeof fetch;
+  try {
+    await getLiveModelCatalog(true);
+    const result = await structuredOpenRouterCall({ role: "vision", requestedModelId: "google/gemma-truncated-test:free", prompt: "ROLE: REFERENCE_CLASSIFIER\nInspect the uploaded reference." });
+    assert.deepEqual(result.value, value);
+    assert.deepEqual(routes, ["google/gemma-truncated-test:free", "nvidia/nemotron-truncation-fallback:free"]);
+  } finally {
+    globalThis.fetch = original;
+    if (key === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = key;
+    if (preferred === undefined) delete process.env.MODEL_PREFERRED_FAMILIES; else process.env.MODEL_PREFERRED_FAMILIES = preferred;
+  }
+});
+
+test("when no free route completes a structured response, truncation reports the actual workflow stage", async () => {
+  const original = globalThis.fetch, key = process.env.OPENROUTER_API_KEY;
+  process.env.OPENROUTER_API_KEY = "test-only-not-a-real-key";
+  let calls = 0;
+  globalThis.fetch = (async (url, options) => {
+    if (String(url).endsWith("/models")) return Response.json({ data: [{ id: "test/only-truncated:free", pricing: { prompt: "0", completion: "0" }, context_length: 128_000, supported_parameters: ["response_format"], architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } }] });
+    calls++;
+    const body = JSON.parse(String(options?.body)) as { model: string };
+    return Response.json({ model: body.model, choices: [{ message: { content: "{", }, finish_reason: "length" }] });
+  }) as typeof fetch;
+  try {
+    await getLiveModelCatalog(true);
+    await assert.rejects(
+      structuredOpenRouterCall({ role: "vision", prompt: "ROLE: REFERENCE_CLASSIFIER\nInspect the uploaded reference." }),
+      /reference inspection.*No partial result was accepted/i,
+    );
+    assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = original;
+    if (key === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = key;
+  }
+});
+
 test("native schema and advertised reasoning controls survive a format retry followed by free fallback", async () => {
   const original = globalThis.fetch, key = process.env.OPENROUTER_API_KEY, retries = process.env.MAX_MODEL_RETRIES;
   process.env.OPENROUTER_API_KEY = "test-only-not-a-real-key"; process.env.MAX_MODEL_RETRIES = "1";

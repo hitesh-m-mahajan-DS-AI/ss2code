@@ -28,3 +28,19 @@ export function formatDiagnostics(error: unknown): string {
   if (!(error instanceof z.ZodError)) return "The response was not a valid JSON object.";
   return error.issues.slice(0, 8).map(issue => `${issue.path.join(".") || "response"}: ${issue.code}`).join("; ").slice(0, 1200);
 }
+
+/** Persist only bounded contract locations/codes; never completion values or arbitrary record keys. */
+export function schemaFailureCode(error: unknown): string {
+  if (!(error instanceof z.ZodError)) return "SCHEMA_INVALID:invalid_json";
+  const recordSections = new Set(["colors", "spacing", "radii", "shadows", "motion"]);
+  const summary = error.issues.slice(0, 4).map(issue => {
+    const isTokenRecordEntry = issue.path[0] === "designTokens" && typeof issue.path[1] === "string" && recordSections.has(issue.path[1]);
+    const path = issue.path.slice(0, isTokenRecordEntry ? 2 : 4).map(part => {
+      if (typeof part === "number") return "item";
+      return /^[A-Za-z_][A-Za-z0-9_]{0,40}$/.test(part) ? part : "field";
+    }).join(".") || "response";
+    const code = /^[a-z_]+$/.test(issue.code) ? issue.code : "invalid";
+    return `${path}:${code}`;
+  });
+  return `SCHEMA_INVALID:${(summary.join(",") || "unknown").slice(0, 128)}`;
+}

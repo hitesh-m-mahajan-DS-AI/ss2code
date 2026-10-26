@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { scopedOutputContract, formatDiagnostics, contractFingerprint } from "../src/server/output-contract";
+import { scopedOutputContract, formatDiagnostics, schemaFailureCode, contractFingerprint } from "../src/server/output-contract";
 import { generatedProjectSchema, patchSetSchema, percentBoundsSchema, visualSpecSchema } from "../src/lib/schemas";
 import { classifyValidatedReference, assertReferenceViewports } from "../src/server/reference-classification";
 import { fixtureSpec } from "./support/fixture";
@@ -48,6 +48,19 @@ test("generation contract binds exact planned count, unique paths and native sch
   assert.throws(() => scopedOutputContract("GENERATE", generatedProjectSchema, ["src/App.tsx", "src/App.tsx"]));
   assert.equal(formatDiagnostics(new SyntaxError("private completion contents")), "The response was not a valid JSON object.");
   assert.ok(!formatDiagnostics(new z.ZodError([])).includes("private"));
+});
+
+test("schema failure evidence identifies bounded contract paths without persisting model values or record keys", () => {
+  const recordSchema = z.object({ designTokens: z.object({ colors: z.record(z.number()) }) });
+  const failure = recordSchema.safeParse({ designTokens: { colors: { "private screenshot text": "not a number" } } });
+  assert.equal(failure.success, false);
+  if (!failure.success) {
+    const code = schemaFailureCode(failure.error);
+    assert.match(code, /^SCHEMA_INVALID:designTokens\.colors:invalid_type$/);
+    assert.doesNotMatch(code, /private screenshot text|not a number/);
+  }
+  assert.equal(schemaFailureCode(new SyntaxError("private completion contents")), "SCHEMA_INVALID:invalid_json");
+  assert.equal(schemaFailureCode(new z.ZodError([])), "SCHEMA_INVALID:unknown");
 });
 
 test("patch contracts cannot add paths or repeat files, while unresolved empty patches remain valid", () => {
